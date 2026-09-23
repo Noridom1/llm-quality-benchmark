@@ -1,0 +1,24 @@
+From 83d50b64305cd07ddb2b0abdaa7c634ab10a5a0b Mon Sep 17 00:00:00 2001
+From: Noridom1 <thinhphuc2005@gmail.com>
+Date: Wed, 23 Sep 2026 08:18:46 +0000
+Subject: [PATCH] Bump mini-swe-agent submodule to local streaming patch
+
+Points at 9a66c1a (branch local-glm-streaming-patch), which streams
+litellm completions to avoid idle-timeout on long CoT responses. See
+that commit for details. Local commit only, not pushed upstream.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ mini-swe-agent | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mini-swe-agent b/mini-swe-agent
+index d74716a..9a66c1a 160000
+--- a/mini-swe-agent
++++ b/mini-swe-agent
+@@ -1 +1 @@
+-Subproject commit d74716a3c8104a113f77cc9ab94cf407ecdcf1e9
++Subproject commit 9a66c1acdbc7c65cab40b25e458e8f5de104234a
+-- 
+2.34.1
+

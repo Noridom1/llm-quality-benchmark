@@ -1,0 +1,35 @@
+# Vendored benchmark harnesses — each is its own independently managed git
+# repo (own remote, own history). We don't embed them here to avoid
+# unmanaged gitlinks; our local modifications to them are captured as
+# patches under patches/ and applied on top of a fresh clone at build time.
+/BFCL/
+/LiveCodeBench/
+/SciCode/
+/SWE-bench_Pro-os/
+/deep-swe/
+
+# Separate CI repo (own git history) — not part of this project.
+/InferenceX/
+
+# Per-benchmark Python virtualenvs — rebuilt from each benchmark's
+# requirements via scripts/, not shipped in git (~8GB combined).
+/.venv-*/
+
+# Run outputs and logs — authoritative results live under jobs/<RUN_ID>/,
+# but they're large, per-run, and regenerable, not source.
+/jobs/
+/logs/
+
+# Secrets — .env.example is the tracked template.
+/.env
+
+# Claude Code local session/session-tool state.
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
+
+# Personal dev-tool config, unrelated to the harness.
+/opencode.json
+
+# Python
+__pycache__/
+*.pyc

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Code Generation: GLM-5.2 vs GLM-5.3</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page-plane:     #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --series-1:       #2a78d6;
+    --series-2:       #eb6834;
+    --border:         rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page-plane:     #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --border:         rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page-plane:     #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --border:         rgba(255,255,255,0.10);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background: var(--page-plane); }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-plane);
+    padding: 32px 16px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px clamp(16px, 4vw, 48px) 28px;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-style: italic;
+    font-weight: 800;
+    font-size: clamp(20px, 3.4vw, 30px);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+  }
+  .subtitle { font-size: 14px; color: var(--text-secondary); margin: 0 0 20px; }
+  .legend { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  .chart-wrap { width: 100%; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; min-width: 360px; }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; }
+  .axis-label { font-size: 12px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .cat-label { font-size: 13px; font-weight: 600; fill: var(--text-primary); }
+  .cat-sublabel { font-size: 10.5px; fill: var(--text-muted); }
+  .value-label { font-size: 12px; font-weight: 600; fill: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .footnote { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+  .footnote strong { color: var(--text-primary); }
+  .source { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <div class="card">
+    <p class="eyebrow">Nhóm 2 / 3 · Code Generation</p>
+    <h1>Code Generation: GLM-5.2 vs GLM-5.3</h1>
+    <p class="subtitle">Sinh code một lượt (competitive programming, bài khoa học)</p>
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>GLM-5.2-w4afp8</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--series-2)"></span>GLM-5.3-w4afp8</div>
+    </div>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 540 620" role="img" aria-label="Code Generation: GLM-5.2 vs GLM-5.3">
+        <line x1="60" y1="560.0" x2="500" y2="560.0" class="gridline"/>
+        <text x="46" y="564.0" class="axis-label" text-anchor="end">0</text>
+        <line x1="60" y1="460.0" x2="500" y2="460.0" class="gridline"/>
+        <text x="46" y="464.0" class="axis-label" text-anchor="end">20</text>
+        <line x1="60" y1="360.0" x2="500" y2="360.0" class="gridline"/>
+        <text x="46" y="364.0" class="axis-label" text-anchor="end">40</text>
+        <line x1="60" y1="260.0" x2="500" y2="260.0" class="gridline"/>
+        <text x="46" y="264.0" class="axis-label" text-anchor="end">60</text>
+        <line x1="60" y1="160.0" x2="500" y2="160.0" class="gridline"/>
+        <text x="46" y="164.0" class="axis-label" text-anchor="end">80</text>
+        <line x1="60" y1="60.0" x2="500" y2="60.0" class="gridline"/>
+        <text x="46" y="64.0" class="axis-label" text-anchor="end">100</text>
+        <line x1="60" y1="560" x2="500" y2="560" class="baseline"/>
+        <rect x="133.5" y="257.5" width="34" height="302.5" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — LiveCodeBench*: 60.50%</title></rect>
+        <rect x="172.5" y="87.5" width="34" height="472.5" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — LiveCodeBench*: 94.50%</title></rect>
+        <rect x="353.5" y="358.2" width="34" height="201.8" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — SciCode: 40.35%</title></rect>
+        <rect x="392.5" y="358.2" width="34" height="201.8" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — SciCode: 40.35%</title></rect>
+        <text x="150.5" y="249.5" class="value-label" text-anchor="middle">60.50</text>
+        <text x="189.5" y="79.5" class="value-label" text-anchor="middle">94.50</text>
+        <text x="370.5" y="350.2" class="value-label" text-anchor="middle">40.35</text>
+        <text x="409.5" y="350.2" class="value-label" text-anchor="middle">40.35</text>
+        <text x="170.0" y="584" class="cat-label" text-anchor="middle">LiveCodeBench*</text>
+        <text x="170.0" y="601" class="cat-sublabel" text-anchor="middle">Pass@1 (200 câu, mẫu số đã hiệu chỉnh)</text>
+        <text x="390.0" y="584" class="cat-label" text-anchor="middle">SciCode</text>
+        <text x="390.0" y="601" class="cat-sublabel" text-anchor="middle">Sub-step correctness (114 step)</text>
+      </svg>
+    </div>
+    <div class="footnote"><strong>* LiveCodeBench:</strong> số đã hiệu chỉnh về đúng mẫu số 200 câu (bản gốc harness báo 97.42%/94 nhưng bỏ sót 6 câu bị crash lúc chấm điểm thay vì tính fail — đã sửa lại; baseline cũng hiệu chỉnh tương tự, 60.80%→60.50%). Vẫn còn nghi vấn contamination do gần bão hoà ở cả câu khó (97.1%) — <strong>chưa nên coi là số final</strong>, xem README.md để biết chi tiết.<br><strong>SciCode:</strong> hai giá trị sub-step trùng nhau (40.35%) là trùng hợp thống kê thật, đã verify từng problem (13/30 bài có kết quả khác nhau giữa 2 run) — không phải bug/cache.</div>
+    <div class="source">Nguồn: jobs/glm5.2-selfhost-extended/ và jobs/glm5.3-w4afp8/README.md · cập nhật 2026-09-14</div>
+  </div>
+</div>
+</body>
+</html>

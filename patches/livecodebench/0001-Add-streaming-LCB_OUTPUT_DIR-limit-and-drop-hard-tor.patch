@@ -1,0 +1,232 @@
+From e4786bfdfd498bff5c39cb264b2153a5349c353f Mon Sep 17 00:00:00 2001
+From: Noridom1 <thinhphuc2005@gmail.com>
+Date: Wed, 23 Sep 2026 08:18:18 +0000
+Subject: [PATCH] Add streaming, LCB_OUTPUT_DIR, --limit, and drop hard
+ torch.cuda dep
+
+- Stream OpenAI-compatible completions (oai_runner.py) so long CoT
+  models like GLM-5.2 don't idle-timeout mid-generation on a buffered
+  response; accumulate chunks back into the non-stream list[str] shape.
+- Register z-ai/glm-5.2 and google/gemma-4-31b-it in lm_styles.py.
+- Respect LCB_OUTPUT_DIR env var for cache/output paths (path_utils.py,
+  base_runner.py, main.py) instead of hardcoding "output/"/"cache/" in
+  the repo's own directory, so runs can write into jobs/<RUN_ID>/.
+- Add --limit CLI flag for smoke-testing a subset of problems.
+- parser.py: drop the `import torch` / torch.cuda.device_count() default
+  for tensor_parallel_size (only relevant to the local-vLLM inference
+  path, not the OpenAI-compatible API path actually used here); default
+  tensor_parallel_size to 1 instead.
+
+Local commit only, not pushed upstream.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ lcb_runner/lm_styles.py          | 14 ++++++++++++
+ lcb_runner/runner/base_runner.py |  2 +-
+ lcb_runner/runner/main.py        |  5 +++-
+ lcb_runner/runner/oai_runner.py  | 39 ++++++++++++++++++++++++++++++++
+ lcb_runner/runner/parser.py      |  9 ++++++--
+ lcb_runner/utils/path_utils.py   | 14 +++++++++---
+ 6 files changed, 76 insertions(+), 7 deletions(-)
+
+diff --git a/lcb_runner/lm_styles.py b/lcb_runner/lm_styles.py
+index d10b211..e2fd53a 100644
+--- a/lcb_runner/lm_styles.py
++++ b/lcb_runner/lm_styles.py
+@@ -861,6 +861,20 @@ LanguageModelList: list[LanguageModel] = [
+         datetime(2024, 4, 1),
+         "https://huggingface.co/agentica-org/DeepCoder-14B-Preview",
+     ),
++    LanguageModel(
++        "z-ai/glm-5.2",
++        "GLM-5.2",
++        LMStyle.OpenAIChat,
++        datetime(2024, 6, 30),
++        "https://huggingface.co/z-ai/glm-5.2",
++    ),
++    LanguageModel(
++        "google/gemma-4-31b-it",
++        "Gemma-4-31B-it",
++        LMStyle.OpenAIChat,
++        datetime(2024, 6, 30),
++        "https://huggingface.co/google/gemma-4-31b-it",
++    ),
+ ]
+ 
+ LanguageModelStore: dict[str, LanguageModel] = {
+diff --git a/lcb_runner/runner/base_runner.py b/lcb_runner/runner/base_runner.py
+index d99c824..cb503c0 100644
+--- a/lcb_runner/runner/base_runner.py
++++ b/lcb_runner/runner/base_runner.py
+@@ -123,7 +123,7 @@ class BaseRunner(ABC):
+     def run_main_repair(self, benchmark: list, format_prompt: callable) -> list[list[str]]:
+         assert self.args.n == 1
+         with open(
+-            f"output/{self.model.model_repr}/{Scenario.codegeneration}_{self.args.codegen_n}_{self.args.temperature}_eval_all.json"
++            f"{os.environ.get('LCB_OUTPUT_DIR', '')}output/{self.model.model_repr}/{Scenario.codegeneration}_{self.args.codegen_n}_{self.args.temperature}_eval_all.json"
+         ) as f:
+             check_metadata_list = json.load(f)
+ 
+diff --git a/lcb_runner/runner/main.py b/lcb_runner/runner/main.py
+index 07902b3..70abbec 100644
+--- a/lcb_runner/runner/main.py
++++ b/lcb_runner/runner/main.py
+@@ -23,6 +23,9 @@ def main():
+     if args.debug:
+         print(f"Running with {len(benchmark)} instances in debug mode")
+         benchmark = benchmark[:15]
++    elif args.limit is not None:
++        print(f"Limiting to first {args.limit} of {len(benchmark)} instances")
++        benchmark = benchmark[:args.limit]
+ 
+     output_path = get_output_path(model.model_repr, args)
+     eval_file = output_path.replace(".json", "_eval.json")
+@@ -181,7 +184,7 @@ def main():
+         elif args.scenario == Scenario.selfrepair:
+             metadatas = metrics[2]
+             with open(
+-                f"output/{model.model_repr}/{Scenario.codegeneration}_{args.codegen_n}_{args.temperature}_eval_all.json"
++                f"{os.environ.get('LCB_OUTPUT_DIR', '')}output/{model.model_repr}/{Scenario.codegeneration}_{args.codegen_n}_{args.temperature}_eval_all.json"
+             ) as f:
+                 code_gen_evals = json.load(f)
+             original_code_lists = [
+diff --git a/lcb_runner/runner/oai_runner.py b/lcb_runner/runner/oai_runner.py
+index 59e2074..0a6616b 100644
+--- a/lcb_runner/runner/oai_runner.py
++++ b/lcb_runner/runner/oai_runner.py
+@@ -42,9 +42,40 @@ class OpenAIRunner(BaseRunner):
+                 "presence_penalty": 0,
+                 "n": args.n,
+                 "timeout": args.openai_timeout,
++                # Stream so GLM-5.2 reasoning tokens keep the connection alive
++                # (token frames reset server/LB idle timers) instead of blocking
++                # on a single buffered response that idle-timeouts mid-CoT. The
++                # non-stream OpenAI default would hold the socket quiet for the
++                # entire reasoning trace before the first byte of content.
++                "stream": True,
+                 # "stop": args.stop, --> stop is only used for base models currently
+             }
+ 
++    @staticmethod
++    def _accumulate_stream(stream) -> list[str]:
++        """Fold a stream of ChatCompletionChunk into the list[str] of final
++        contents per choice that the non-stream path returned
++        (``[c.message.content for c in response.choices]``).
++
++        GLM-5.2 emits its CoT in ``delta.reasoning_content`` and the answer in
++        ``delta.content``; we keep only ``content`` to match the non-stream
++        contract. The endpoint does not send a ``usage`` chunk, so usage stays
++        None (the runner downstream only reads ``choices[i].message.content``).
++        """
++        contents: dict[int, list[str]] = {}
++        for chunk in stream:
++            if not getattr(chunk, "choices", None):
++                continue
++            for choice in chunk.choices:
++                idx = choice.index if choice.index is not None else 0
++                delta = choice.delta
++                if delta is None:
++                    continue
++                if getattr(delta, "content", None):
++                    contents.setdefault(idx, []).append(delta.content)
++        indices = sorted(contents) if contents else [0]
++        return ["".join(contents.get(i, [])) for i in indices]
++
+     def _run_single(self, prompt: list[dict[str, str]], n: int = 10) -> list[str]:
+         assert isinstance(prompt, list)
+ 
+@@ -53,6 +84,14 @@ class OpenAIRunner(BaseRunner):
+             return []
+ 
+         try:
++            if self.client_kwargs.get("stream"):
++                # Stream=True returns an iterator, not a ChatCompletion; consume
++                # it into the same list[str] shape the non-stream path returns.
++                stream = OpenAIRunner.client.chat.completions.create(
++                    messages=prompt,
++                    **self.client_kwargs,
++                )
++                return self._accumulate_stream(stream)
+             response = OpenAIRunner.client.chat.completions.create(
+                 messages=prompt,
+                 **self.client_kwargs,
+diff --git a/lcb_runner/runner/parser.py b/lcb_runner/runner/parser.py
+index a047fc0..5f68a2d 100644
+--- a/lcb_runner/runner/parser.py
++++ b/lcb_runner/runner/parser.py
+@@ -1,5 +1,4 @@
+ import os
+-import torch
+ import argparse
+ 
+ from lcb_runner.utils.scenarios import Scenario
+@@ -131,13 +130,19 @@ def get_args():
+         default=None,
+         help="End date for the contest to filter the evaluation file (format - YYYY-MM-DD)",
+     )
++    parser.add_argument(
++        "--limit",
++        type=int,
++        default=None,
++        help="Limit the number of benchmark problems to run (first N). Useful for smoke tests.",
++    )
+ 
+     args = parser.parse_args()
+ 
+     args.stop = args.stop.split(",")
+ 
+     if args.tensor_parallel_size == -1:
+-        args.tensor_parallel_size = torch.cuda.device_count()
++        args.tensor_parallel_size = 1
+ 
+     if args.multiprocess == -1:
+         args.multiprocess = os.cpu_count()
+diff --git a/lcb_runner/utils/path_utils.py b/lcb_runner/utils/path_utils.py
+index 9f28a1a..3bcec66 100644
+--- a/lcb_runner/utils/path_utils.py
++++ b/lcb_runner/utils/path_utils.py
+@@ -1,4 +1,5 @@
+ import pathlib
++import os
+ 
+ from lcb_runner.lm_styles import LanguageModel, LMStyle
+ from lcb_runner.utils.scenarios import Scenario
+@@ -12,11 +13,16 @@ def ensure_dir(path: str, is_file=True):
+     return
+ 
+ 
++def _out_base() -> str:
++    return os.environ.get("LCB_OUTPUT_DIR", "")
++
++
+ def get_cache_path(model_repr:str, args) -> str:
+     scenario: Scenario = args.scenario
+     n = args.n
+     temperature = args.temperature
+-    path = f"cache/{model_repr}/{scenario}_{n}_{temperature}.json"
++    base = _out_base()
++    path = f"{base}cache/{model_repr}/{scenario}_{n}_{temperature}.json"
+     ensure_dir(path)
+     return path
+ 
+@@ -26,7 +32,8 @@ def get_output_path(model_repr:str, args) -> str:
+     n = args.n
+     temperature = args.temperature
+     cot_suffix = "_cot" if args.cot_code_execution else ""
+-    path = f"output/{model_repr}/{scenario}_{n}_{temperature}{cot_suffix}.json"
++    base = _out_base()
++    path = f"{base}output/{model_repr}/{scenario}_{n}_{temperature}{cot_suffix}.json"
+     ensure_dir(path)
+     return path
+ 
+@@ -36,5 +43,6 @@ def get_eval_all_output_path(model_repr:str, args) -> str:
+     n = args.n
+     temperature = args.temperature
+     cot_suffix = "_cot" if args.cot_code_execution else ""
+-    path = f"output/{model_repr}/{scenario}_{n}_{temperature}{cot_suffix}_eval_all.json"
++    base = _out_base()
++    path = f"{base}output/{model_repr}/{scenario}_{n}_{temperature}{cot_suffix}_eval_all.json"
+     return path
+-- 
+2.34.1
+

@@ -1,0 +1,44 @@
+task: hle_multiple_choice
+dataset_path: cais/hle
+test_split: test
+output_type: generate_until
+process_docs: !function utils.process_docs_multiple_choice
+doc_to_text: !function utils.doc_to_text
+doc_to_target: answer
+filter_list:
+  # HLE multiple-choice questions are NOT limited to 5 options -- the answer
+  # key runs well past E (observed targets up to T). The original [A-E] class
+  # silently dropped every answer beyond E to the "[invalid]" fallback, so a
+  # correct "The answer is (H)" scored 0. Match the full [A-Z] range.
+  # \** absorbs markdown bold ("**F**"); the trailing lookahead keeps the
+  # capture to a standalone letter instead of the first letter of a word.
+  - name: "custom-extract"
+    filter:
+      - function: "regex"
+        regex_pattern: 'answer is \**\(?([A-Z])\)?\**(?![A-Za-z])'
+        group_select: -1
+      - function: "take_first"
+  # Looser fallback for responses that phrase the conclusion differently
+  # ("Answer: H"). The previous fallback was "\b([A-E])\b", which took the last
+  # standalone A-E anywhere in the chain of thought -- usually an option label
+  # being discussed rather than the final answer.
+  - name: "flexible-extract"
+    filter:
+      - function: "regex"
+        regex_pattern: '(?:answer|Answer)\s*(?:is|:)\s*\**\(?([A-Z])\)?'
+        group_select: -1
+      - function: "take_first"
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+    ignore_case: true
+    ignore_punctuation: true
+generation_kwargs:
+  until:
+    - "Question:"
+  max_gen_toks: 32768
+  do_sample: false
+  temperature: 0.0
+metadata:
+  version: 2.0

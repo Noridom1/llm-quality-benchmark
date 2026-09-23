@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Knowledge & Tool-use: GLM-5.2 vs GLM-5.3</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page-plane:     #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --series-1:       #2a78d6;
+    --series-2:       #eb6834;
+    --border:         rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page-plane:     #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --border:         rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page-plane:     #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --border:         rgba(255,255,255,0.10);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background: var(--page-plane); }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-plane);
+    padding: 32px 16px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px clamp(16px, 4vw, 48px) 28px;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-style: italic;
+    font-weight: 800;
+    font-size: clamp(20px, 3.4vw, 30px);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+  }
+  .subtitle { font-size: 14px; color: var(--text-secondary); margin: 0 0 20px; }
+  .legend { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  .chart-wrap { width: 100%; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; min-width: 360px; }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; }
+  .axis-label { font-size: 12px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .cat-label { font-size: 13px; font-weight: 600; fill: var(--text-primary); }
+  .cat-sublabel { font-size: 10.5px; fill: var(--text-muted); }
+  .value-label { font-size: 12px; font-weight: 600; fill: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .footnote { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+  .footnote strong { color: var(--text-primary); }
+  .source { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <div class="card">
+    <p class="eyebrow">Nhóm 3 / 3 · Knowledge, Reasoning & Tool-use</p>
+    <h1>Knowledge & Tool-use: GLM-5.2 vs GLM-5.3</h1>
+    <p class="subtitle">Kiến thức tổng quát, suy luận chuyên sâu, và gọi hàm/tool</p>
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>GLM-5.2-w4afp8</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--series-2)"></span>GLM-5.3-w4afp8</div>
+    </div>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 980 620" role="img" aria-label="Knowledge & Tool-use: GLM-5.2 vs GLM-5.3">
+        <line x1="60" y1="560.0" x2="940" y2="560.0" class="gridline"/>
+        <text x="46" y="564.0" class="axis-label" text-anchor="end">0</text>
+        <line x1="60" y1="460.0" x2="940" y2="460.0" class="gridline"/>
+        <text x="46" y="464.0" class="axis-label" text-anchor="end">20</text>
+        <line x1="60" y1="360.0" x2="940" y2="360.0" class="gridline"/>
+        <text x="46" y="364.0" class="axis-label" text-anchor="end">40</text>
+        <line x1="60" y1="260.0" x2="940" y2="260.0" class="gridline"/>
+        <text x="46" y="264.0" class="axis-label" text-anchor="end">60</text>
+        <line x1="60" y1="160.0" x2="940" y2="160.0" class="gridline"/>
+        <text x="46" y="164.0" class="axis-label" text-anchor="end">80</text>
+        <line x1="60" y1="60.0" x2="940" y2="60.0" class="gridline"/>
+        <text x="46" y="64.0" class="axis-label" text-anchor="end">100</text>
+        <line x1="60" y1="560" x2="940" y2="560" class="baseline"/>
+        <rect x="143.5" y="138.3" width="24" height="421.7" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — GPQA Diamond: 84.34%</title></rect>
+        <rect x="172.5" y="120.6" width="24" height="439.4" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — GPQA Diamond: 87.88%</title></rect>
+        <rect x="363.5" y="138.4" width="24" height="421.6" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — MMLU-Pro: 84.33%</title></rect>
+        <rect x="392.5" y="133.4" width="24" height="426.6" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — MMLU-Pro: 85.32%</title></rect>
+        <rect x="583.5" y="370.0" width="24" height="190.0" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — HLE: 38.00%</title></rect>
+        <rect x="612.5" y="388.0" width="24" height="172.0" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — HLE: 34.40%</title></rect>
+        <rect x="803.5" y="133.4" width="24" height="426.6" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — BFCL: 85.32%</title></rect>
+        <rect x="832.5" y="138.1" width="24" height="421.9" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — BFCL: 84.38%</title></rect>
+        <text x="155.5" y="130.3" class="value-label" text-anchor="middle">84.34</text>
+        <text x="184.5" y="112.6" class="value-label" text-anchor="middle">87.88</text>
+        <text x="375.5" y="130.4" class="value-label" text-anchor="middle">84.33</text>
+        <text x="404.5" y="125.4" class="value-label" text-anchor="middle">85.32</text>
+        <text x="595.5" y="362.0" class="value-label" text-anchor="middle">38.00</text>
+        <text x="624.5" y="380.0" class="value-label" text-anchor="middle">34.40</text>
+        <text x="815.5" y="125.4" class="value-label" text-anchor="middle">85.32</text>
+        <text x="844.5" y="130.1" class="value-label" text-anchor="middle">84.38</text>
+        <text x="170.0" y="584" class="cat-label" text-anchor="middle">GPQA Diamond</text>
+        <text x="170.0" y="601" class="cat-sublabel" text-anchor="middle">Acc (n=198)</text>
+        <text x="390.0" y="584" class="cat-label" text-anchor="middle">MMLU-Pro</text>
+        <text x="390.0" y="601" class="cat-sublabel" text-anchor="middle">Acc (n=504)</text>
+        <text x="610.0" y="584" class="cat-label" text-anchor="middle">HLE</text>
+        <text x="610.0" y="601" class="cat-sublabel" text-anchor="middle">LLM-judge (n=250)</text>
+        <text x="830.0" y="584" class="cat-label" text-anchor="middle">BFCL</text>
+        <text x="830.0" y="601" class="cat-sublabel" text-anchor="middle">Overall avg (13 category)</text>
+      </svg>
+    </div>
+    <div class="footnote"><strong>BFCL:</strong> trung bình cộng Non-Live Overall và Live Overall (AST), đủ 13/13 category single-turn.<br><strong>HLE:</strong> dùng lớp LLM-judge (deepseek-v4-pro), đã kiểm chứng chéo, không dùng số exact-match thô.</div>
+    <div class="source">Nguồn: jobs/glm5.2-selfhost-extended/ và jobs/glm5.3-w4afp8/README.md · cập nhật 2026-09-14</div>
+  </div>
+</div>
+</body>
+</html>
