@@ -15,7 +15,23 @@ All scripts `cd` to the repo root and source `.env` themselves.
 | `run_swebench_pro.sh` | SWE-bench Pro | Docker per instance |
 | `run_deepswe.sh` | DeepSWE | Docker per task |
 | `run_deepswe_batches.sh` | DeepSWE (full, batched) | Docker per task |
+| `run_deepswe_tasks.sh` | DeepSWE, explicit task list | Docker per task |
 | `retry_scicode.sh` | SciCode retry helper | Sandboxed Python |
+| `run_ifeval.sh` | IFEval (not part of the core 8) | None |
+
+## Other orchestration scripts
+
+| Script | Purpose |
+|---|---|
+| `run_main_benchmark.sh` | The vetted "main benchmark" recipe (fixed subset sizes/CCU) -- see its own header comment and `docs/quality-benchmark-recipes.md`. |
+| `run_general_balanced.sh` | Alternate "Balanced tier" recipe for GPQA/MMLU-Pro/HLE (smaller counts, CCU 2) instead of the main config. |
+| `run_all_smoke_sequential.sh` | Sequential smoke test across all 8 benchmarks, one at a time, with retry/cooldown for rate-limited endpoints. |
+| `run_deepswe_tasks.sh` | Resume/extend a DeepSWE run against an explicit task-list file (`deepswe_tasks_*.txt`) instead of a random N-task sample -- see its header comment for why (pier can't extend an existing job's task count). |
+| `watch_run.sh` | Live monitoring/alert loop for a running SWE-bench Pro campaign (patch-count, disk space, prune-loop liveness). Usage: `RUN_ID=<id> bash scripts/watch_run.sh`. |
+| `progress.sh` | Quick one-shot progress check across `jobs/<RUN_ID>/`. |
+| `prune_loop.sh` | Continuous Docker image/container pruning, run alongside SWE-bench Pro to avoid disk-full crashes. |
+| `prune_done_images.py` / `prune_failed_preds.py` | One-off cleanup helpers for SWE-bench Pro Docker images / failed prediction retries. |
+| `judge_hle.py` / `judge_hle.sh` / `rescore_hle.sh` / `compare_judges.py` | HLE's 3-judge scoring pipeline and judge-comparison tooling. |
 
 ## DeepSWE
 
