@@ -1,0 +1,41 @@
+# Vendored benchmark harnesses that get freshly cloned from upstream +
+# patched during the image build (see deployment/Dockerfile) instead of
+# being copied from the local checkout -- keeps the build context small and
+# guarantees the image is built from a clean, reproducible base + our
+# tracked patches/, not whatever incidental local state happens to be on
+# disk right now.
+BFCL
+LiveCodeBench
+SWE-bench_Pro-os
+
+# SciCode is also freshly cloned, EXCEPT eval/data/test_data.h5: a ~1GB data
+# blob with no programmatic source (SciCode's own README says it's a manual
+# Google Drive download) that must be copied in from the local checkout.
+SciCode/*
+!SciCode/eval
+SciCode/eval/*
+!SciCode/eval/data
+SciCode/eval/data/*
+!SciCode/eval/data/test_data.h5
+
+# deep-swe has no upstream remote (intentionally pinned, vendored baseline --
+# see its root commit message) so it's copied wholesale, but its local .git
+# history is only needed for our own audit trail, not inside the image.
+deep-swe/.git
+
+# Separate CI repo -- not part of this image.
+InferenceX
+
+# Rebuilt inside the image (per-benchmark venvs) or not build inputs at all.
+.venv-*
+jobs
+logs
+reports
+
+.git
+.env
+.claude
+opencode.json
+
+__pycache__
+*.pyc
