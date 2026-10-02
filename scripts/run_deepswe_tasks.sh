@@ -28,9 +28,12 @@ export MSWEA_STREAM
 TASK_FILE="${1:?usage: run_deepswe_tasks.sh <task-list-file> [CCU]}"
 CCU="${2:-${CCU:-6}}"
 RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
-JOBS_DIR="${JOBS_DIR:-jobs/$RUN_ID/deepswe}"
+# JOBS_ROOT must be the same absolute path the host docker daemon sees:
+# nested containers bind-mount subdirs of it (see docs/running-via-docker.md).
+JOBS_ROOT="${JOBS_ROOT:-$WORKSPACE_DIR/jobs}"
+JOBS_DIR="${JOBS_DIR:-$JOBS_ROOT/$RUN_ID/deepswe}"
 JOB_NAME="${JOB_NAME:-$(basename "$TASK_FILE" .txt)-ccu${CCU}}"
-MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-32768}"
+MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-65536}"
 
 args=()
 n=0

@@ -33,9 +33,12 @@ export MSWEA_STREAM
 N_TASKS="${1:-${N_TASKS:-6}}"
 CCU="${2:-${CCU:-$N_TASKS}}"
 RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
-JOBS_DIR="${JOBS_DIR:-jobs/$RUN_ID/deepswe}"
+# JOBS_ROOT must be the same absolute path the host docker daemon sees:
+# nested containers bind-mount subdirs of it (see docs/running-via-docker.md).
+JOBS_ROOT="${JOBS_ROOT:-$WORKSPACE_DIR/jobs}"
+JOBS_DIR="${JOBS_DIR:-$JOBS_ROOT/$RUN_ID/deepswe}"
 JOB_NAME="${JOB_NAME:-${N_TASKS}tasks-ccu${CCU}}"
-MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-32768}"
+MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-65536}"
 
 echo "=== DeepSWE run ==="
 echo "  RUN_ID     : $RUN_ID"
@@ -46,6 +49,36 @@ echo "  Max tokens : $MAX_GEN_TOKENS per agent turn"
 echo "  Jobs dir   : $JOBS_DIR"
 echo
 
+# Re-running with the same RUN_ID/N_TASKS/CCU resumes the existing job instead of
+# failing with FileExistsError. pier skips every trial that already has a
+# result.json -- including trials that died of infra errors -- so those are
+# removed first (pier job resume -f) and rerun. Only infra-type errors are listed;
+# NonZeroAgentExitCodeError etc. may be the model's own failure, so they stay
+# counted as failures. Override with RETRY_ERROR_TYPES="A B", or RESUME=0 to
+# skip resuming. Caveat: resume replays config.json, so the endpoint/key stored
+# there are used; a changed OPENAI_BASE_URL needs a fresh JOB_NAME.
+RETRY_ERROR_TYPES="${RETRY_ERROR_TYPES:-RuntimeError CancelledError}"
+# Final sweep below (not just the long-lived sidecar loop) is what actually
+# closes the leak: it runs once pier returns, when every trial under JOBS_DIR
+# -- including whichever one finished last -- is guaranteed done, so it can't
+# miss the tail trial the way a sidecar polling on a fixed interval can if it
+# gets stopped between its last check and the trial finishing.
+final_sweep() {
+  JOBS_DIR="$JOBS_DIR" bash "$WORKSPACE_DIR/scripts/prune_deepswe_loop.sh" --once || true
+}
+
+if [[ -f "$JOBS_DIR/$JOB_NAME/config.json" && "${RESUME:-1}" == 1 ]]; then
+  echo "Resuming existing job $JOBS_DIR/$JOB_NAME (rerunning trials with: $RETRY_ERROR_TYPES)"
+  filters=()
+  for t in $RETRY_ERROR_TYPES; do filters+=(-f "$t"); done
+  rc=0
+  uv tool run --from datacurve-pier pier job resume \
+    -p "$JOBS_DIR/$JOB_NAME" "${filters[@]}" || rc=$?
+  final_sweep
+  exit "$rc"
+fi
+
+rc=0
 uv tool run --from datacurve-pier pier run \
   -p deep-swe/tasks \
   --agent mini-swe-agent \
@@ -62,4 +95,6 @@ uv tool run --from datacurve-pier pier run \
   --agent-setup-timeout-multiplier 3 \
   --jobs-dir "$JOBS_DIR" \
   --job-name "$JOB_NAME" \
-  --yes
+  --yes || rc=$?
+final_sweep
+exit "$rc"

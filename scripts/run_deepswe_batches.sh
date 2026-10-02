@@ -30,11 +30,14 @@ BATCH_SIZE="${BATCH_SIZE:-20}"
 CCU="${CCU:-6}"
 MAX_TASKS="${MAX_TASKS:-113}"
 RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
-JOBS_DIR="${JOBS_DIR:-jobs/$RUN_ID/deepswe-batches}"
+# JOBS_ROOT must be the same absolute path the host docker daemon sees:
+# nested containers bind-mount subdirs of it (see docs/running-via-docker.md).
+JOBS_ROOT="${JOBS_ROOT:-$WORKSPACE_DIR/jobs}"
+JOBS_DIR="${JOBS_DIR:-$JOBS_ROOT/$RUN_ID/deepswe-batches}"
 BATCH_DIR="${BATCH_DIR:-task_batches}"
 PRUNE_DOCKER_AFTER_BATCH="${PRUNE_DOCKER_AFTER_BATCH:-0}"
 DOCKER_IMAGE_PRUNE_UNTIL="${DOCKER_IMAGE_PRUNE_UNTIL:-2h}"
-MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-32768}"
+MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-65536}"
 
 cleanup_after_batch() {
   if [ "$PRUNE_DOCKER_AFTER_BATCH" != "1" ]; then
