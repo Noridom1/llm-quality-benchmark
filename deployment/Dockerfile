@@ -30,7 +30,7 @@ FROM ubuntu:22.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       git ca-certificates build-essential \
-      docker.io \
+      docker.io docker-compose-v2 \
       tmux jq procps \
     && rm -rf /var/lib/apt/lists/*
 # docker.io gives us the `docker` CLI binary used by mini-swe-agent's
@@ -38,6 +38,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # out to `docker ...`, they don't use the python SDK for container launch) --
 # the daemon itself is never started here; /var/run/docker.sock must be
 # bind-mounted from the host at `docker run` time.
+# docker-compose-v2 installs `docker compose` as a CLI plugin -- DeepSWE's
+# pier tool shells out to `docker compose ... --project-name ...` to bring up
+# each task's environment; without this plugin the `docker` CLI doesn't
+# recognize the `compose` subcommand at all, and every DeepSWE trial fails
+# immediately with a RuntimeError before the agent ever runs.
 # procps provides pgrep, used by scripts/watch_run.sh and prune_loop.sh.
 
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
@@ -70,7 +75,11 @@ WORKDIR /app/BFCL/berkeley-function-call-leaderboard
 # CUDA download is multi-GB and slow).
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv .venv-bfcl --python 3.10 \
-    && uv pip install --python .venv-bfcl/bin/python -e .
+    && uv pip install --python .venv-bfcl/bin/python -e . \
+    && uv pip install --python .venv-bfcl/bin/python soundfile==0.14.0
+# soundfile: qwen_agent (imported unconditionally by model_config.py) needs it
+# but doesn't declare it; the local venv had it installed by hand. Without it
+# every BFCL run dies at import with "No module named 'soundfile'".
 
 # --- lcb: LiveCodeBench (Python 3.11) ---------------------------------------
 FROM base AS lcb
@@ -92,8 +101,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv .venv-lcb --python 3.11 \
     && uv pip install --python .venv-lcb/bin/python -e . --no-deps \
     && uv pip install --python .venv-lcb/bin/python \
-         openai mistralai==0.4.2 cohere anthropic google-genai together \
-         datasets pebble annotated-types
+         openai mistralai==0.4.2 cohere anthropic==0.49.0 google-genai together \
+         datasets==3.5.0 fsspec==2024.12.0 pebble annotated-types
+# Pinned to the locally-vetted venv: anthropic>=1.0 dropped HUMAN_PROMPT/AI_PROMPT,
+# which lcb_runner/prompts imports at module load (every LCB run dies at
+# import), and datasets>=4.0 dropped the loading-script support the
+# livecodebench/code_generation_lite dataset relies on.
 
 # --- scicode: SciCode (Python 3.12) -----------------------------------------
 FROM base AS scicode
@@ -105,8 +118,13 @@ WORKDIR /app/SciCode
 # `-e .` alone pulls in inspect-ai + litellm (SciCode's own direct deps);
 # h5py bundles its own libhdf5 in the wheel, no apt package needed.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv .venv-scicode --python 3.12 \
-    && uv pip install --python .venv-scicode/bin/python -e .
+    uv venv /app/.venv-scicode --python 3.12 \
+    && uv pip install --python /app/.venv-scicode/bin/python -e . openai==3.3.1
+# openai: SciCode doesn't pin it, and the resolver picks 2.x, but inspect_ai's
+# OpenAI provider refuses to start below 3.1.0 (the local venv has 3.3.1).
+# The venv lives at /app/.venv-scicode, not inside SciCode/: scripts/run_scicode.sh
+# (and retry_/ci_run_scicode.sh) call $WORKSPACE_DIR/.venv-scicode/bin/inspect,
+# matching the local layout.
 # test_data.h5 has no programmatic source (SciCode's README: manual Google
 # Drive download) -- copied from the build context, see .dockerignore.
 COPY SciCode/eval/data/test_data.h5 /app/SciCode/eval/data/test_data.h5
@@ -116,6 +134,10 @@ FROM base AS swebenchpro
 WORKDIR /app
 RUN git clone --filter=blob:none https://github.com/scaleapi/SWE-bench_Pro-os.git /app/SWE-bench_Pro-os \
     && cd /app/SWE-bench_Pro-os && git checkout ca10a60
+# Adds --revision to generate_sweagent_instances.py so the HF dataset can be
+# pinned (see SWEBENCH_PRO_HF_REVISION in prepare-swebench-pro-data.sh).
+COPY patches/swebench-pro/ /tmp/patches-swbp/
+RUN cd /app/SWE-bench_Pro-os && git apply /tmp/patches-swbp/*.patch && rm -rf /tmp/patches-swbp
 
 # SWE-agent submodule: unmodified, pinned exactly per .gitmodules. Only
 # needed to satisfy requirements.txt imports + provide the on-disk path
@@ -155,7 +177,11 @@ FROM base AS lmeval
 WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv .venv-lmeval --python 3.12 \
-    && uv pip install --python .venv-lmeval/bin/python "lm-eval[api]==0.4.12"
+    && uv pip install --python .venv-lmeval/bin/python "lm-eval[api]==0.4.12" \
+         pillow==12.3.0 immutabledict==4.3.1 langdetect==1.0.9
+# Not pulled in by lm-eval[api] but present in the locally-vetted venv:
+# pillow -- HLE's dataset has an image column, and decoding it fails without it;
+# immutabledict + langdetect -- IFEval's instruction checkers.
 # .venv-lighteval (present locally) is confirmed dead weight -- nothing in
 # scripts/ or tasks/ references lighteval -- so it's intentionally not built.
 
@@ -166,9 +192,15 @@ WORKDIR /app
 COPY --from=bfcl        /app/BFCL              /app/BFCL
 COPY --from=lcb         /app/LiveCodeBench     /app/LiveCodeBench
 COPY --from=scicode     /app/SciCode            /app/SciCode
+COPY --from=scicode     /app/.venv-scicode      /app/.venv-scicode
 COPY --from=swebenchpro /app/SWE-bench_Pro-os  /app/SWE-bench_Pro-os
 COPY --from=swebenchpro /app/.venv-swebenchpro /app/.venv-swebenchpro
 COPY --from=lmeval      /app/.venv-lmeval       /app/.venv-lmeval
+
+# Warm the uv cache with pier (DeepSWE driver) so `uv tool run --from
+# datacurve-pier pier ...` in scripts/run_deepswe*.sh does not re-download ~140
+# packages on every run. Kept before COPY scripts/ so script edits don't rebuild it.
+RUN uv tool run --from datacurve-pier pier --help >/dev/null
 
 # Vendored, no-upstream baseline (pinned to task-schema v1.1 -- see its own
 # git history for the full rationale) -- copied wholesale, not cloned+patched.
