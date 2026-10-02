@@ -67,7 +67,7 @@ RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
 # All questions have associated images (base64); we evaluate text-only using
 # the question text field, which is self-contained for many questions.
 MAX_LENGTH="${MAX_LENGTH:-32768}"
-MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-16384}}"
+MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-65536}}"
 TASK="${TASK:-hle}"
 NUM_FEWSHOT="${NUM_FEWSHOT:-0}"
 BATCH_SIZE="${BATCH_SIZE:-1}"

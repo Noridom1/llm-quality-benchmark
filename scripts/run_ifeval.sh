@@ -51,10 +51,10 @@ RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
 # IFEval is 0-shot by construction (the task yaml hardcodes num_fewshot: 0), ~541
 # prompts covering 25 verifiable instruction types. The task yaml's own cap is
 # 1280 tokens, too small for a reasoning model whose <think> block shares the
-# same budget and would starve the actual answer; default to 8192 like
-# GPQA/MMLU-Pro on this endpoint and override lower for non-reasoning models.
+# same budget and would starve the actual answer; default to 65536 like every
+# other benchmark (MAX_GEN_TOKENS) and override lower for non-reasoning models.
 MAX_LENGTH="${MAX_LENGTH:-8192}"
-MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-8192}}"
+MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-65536}}"
 TASK="${TASK:-ifeval}"
 BATCH_SIZE="${BATCH_SIZE:-1}"
 NUM_CONCURRENT="${NUM_CONCURRENT:-4}"

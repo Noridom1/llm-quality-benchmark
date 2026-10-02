@@ -25,7 +25,7 @@ RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
 SPLIT="${SPLIT:-test}"
 WITH_BACKGROUND="${WITH_BACKGROUND:-False}"
 MAX_CONNECTIONS="${MAX_CONNECTIONS:-4}"
-MAX_TOKENS="${MAX_TOKENS:-32784}"
+MAX_TOKENS="${MAX_TOKENS:-${MAX_GEN_TOKENS:-65536}}"
 LIMIT="${LIMIT:-}"
 SAMPLE_SHUFFLE="${SAMPLE_SHUFFLE:-}"
 
@@ -59,7 +59,7 @@ echo "  Retry on error: $RETRY_ON_ERROR"
 if [[ -n "$LIMIT" ]]; then
   echo "  Limit         : $LIMIT"
 fi
-<parameter name="content">if [[ -n "$SAMPLE_SHUFFLE" ]]; then
+if [[ -n "$SAMPLE_SHUFFLE" ]]; then
   echo "  Sample shuffle: seed=$SAMPLE_SHUFFLE"
 fi
 echo

@@ -50,7 +50,7 @@ RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
 # Defaults (overridable via env): context window, generation length, task, few-shot, concurrency.
 # MMLU-Pro: 12,032 questions, 14 disciplines, 10 options, standard protocol is 5-shot CoT.
 MAX_LENGTH="${MAX_LENGTH:-8192}"
-MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-8192}}"
+MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-65536}}"
 TASK="${TASK:-mmlu_pro}"
 NUM_FEWSHOT="${NUM_FEWSHOT:-5}"
 BATCH_SIZE="${BATCH_SIZE:-1}"

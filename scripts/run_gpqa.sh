@@ -51,7 +51,7 @@ RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
 
 # Defaults (overridable via env): context window, generation length, task variant, few-shot, concurrency.
 MAX_LENGTH="${MAX_LENGTH:-10240}"
-MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-8192}}"
+MAX_GEN_TOKS="${MAX_GEN_TOKS:-${MAX_GEN_TOKENS:-65536}}"
 TASK="${TASK:-gpqa_diamond_cot_n_shot}"
 NUM_FEWSHOT="${NUM_FEWSHOT:-5}"
 BATCH_SIZE="${BATCH_SIZE:-1}"
