@@ -4,6 +4,11 @@ Centralizes the 8-benchmark quality suite into one Docker image. Build once;
 any machine can then run any benchmark by supplying an OpenAI-compatible
 endpoint + api key + model name, without installing any per-benchmark venvs.
 
+This doc covers build + the env-var/volume contract. For the operational
+playbook -- launching the vetted main-benchmark recipe, rerunning/continuing
+a campaign, monitoring, viewing results -- see
+[`docs/running-via-docker.md`](../docs/running-via-docker.md).
+
 ## Build
 
 ```bash
@@ -33,7 +38,7 @@ docker run --rm -it \
   -e OPENAI_BASE_URL=http://your-endpoint:8000/v1 \
   -e MODEL_NAME=z-ai/glm-5.2 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(pwd)/jobs:/app/jobs" \
+  -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
   quality-bench:latest
 ```
 
@@ -64,8 +69,9 @@ docker run --rm -it \
 | `API_KEY` | yes | |
 | `OPENAI_BASE_URL` | yes | Must point at the `/v1`-style base, not a specific route. |
 | `MODEL_NAME` | yes | Without the `openai/` prefix (lm-eval convention) -- scripts add it back where needed. |
-| `HF_TOKEN` | only for SWE-bench Pro | Needed to export the `ScaleAI/SWE-bench_Pro` dataset on first agentic run (see below). |
-| `HLE_MAIN_JUDGE` / `HLE_SECOND_JUDGE` / `HLE_SELF_JUDGE` | for HLE | Same as local `.env` -- see top-level `README.md`. |
+| `HF_TOKEN` | yes, for GPQA / MMLU-Pro / HLE / SWE-bench Pro | GPQA's dataset (`Idavidrein/gpqa`) is gated on Hugging Face and fails outright without it; MMLU-Pro/HLE also read it (higher rate limits / avoids "unauthenticated requests" throttling). For SWE-bench Pro it's needed to export the `ScaleAI/SWE-bench_Pro` dataset on first agentic run (see below). In short: set it unless you're only running LiveCodeBench/SciCode/BFCL/DeepSWE. |
+| `HLE_MAIN_JUDGE` / `HLE_SECOND_JUDGE` / `HLE_SELF_JUDGE` | for HLE | Same as local `.env` -- see top-level `README.md`. Only forwarded when passed; leave unset to get the defaults. |
+| `HLE_JUDGE_BASE_URL` / `HLE_JUDGE_API_KEY` | for HLE, when the endpoint under test doesn't serve the judge models | Where the independent judges are called. Default to `OPENAI_BASE_URL` / `API_KEY`. Without a reachable judge, HLE generation still completes but the run exits 1 with no score. |
 | `RUN_ID`, `LIMIT`, `NUM_CONCURRENT`, `WORKERS`, `CCU`, etc. | no | Same per-benchmark overrides documented in `scripts/README.md` / `scripts/run_main_benchmark.sh`, passed through as ordinary `-e` flags. |
 
 Any other env var a specific `scripts/run_*.sh` reads works the same way --
@@ -87,7 +93,9 @@ The containers it launches are then siblings on the host, not nested. This
 also means the *host* needs disk headroom for SWE-bench Pro's per-instance
 images (~1-3GB each) -- run a prune loop on the host, or pass
 `-e ...` to invoke `scripts/prune_loop.sh` in a sibling container pointed at
-the same socket. DeepSWE's CCU is capped at 8 by the host's default Docker
+the same socket. DeepSWE leaves its own per-trial images behind and needs
+`scripts/prune_deepswe_loop.sh` instead (see `docs/running-via-docker.md`).
+DeepSWE's CCU is capped at 8 by the host's default Docker
 network-address-pool (~31 networks, 2/trial); `run_main_benchmark.sh` already
 bakes this in.
 
@@ -107,6 +115,14 @@ aren't baked into the image (the former is a generated manifest, the latter
 requires `HF_TOKEN` to export from Hugging Face -- baking a secret into an
 image layer would be a mistake). `deployment/entrypoint.sh` generates both
 automatically before an `agentic` or `swebench_pro` run if they're missing.
+
+Both are pinned to HF revision `7ab5114` (the 731-task v1 dataset every
+baseline was scored against) via `SWEBENCH_PRO_HF_REVISION`. Don't unpin it:
+upstream's 2026-09-22 V2 commit (642 tasks) renamed the tests, and the repo's
+`run_scripts/*/parser.py` still emit the old names, so nearly every instance
+scores false even when its tests pass. Each file carries a `.hf-revision`
+stamp, and a file from another revision on a persisted volume is regenerated.
+
 To avoid regenerating them on every container run, mount a persistent volume:
 
 ```bash

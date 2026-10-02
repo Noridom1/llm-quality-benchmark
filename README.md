@@ -35,6 +35,10 @@ Fill in `.env`:
   (default `qwen/qwen3.7-plus`). Set to empty to run only one judge.
 - `HLE_SELF_JUDGE` — optional; `1` (default) also has the model under test grade
   itself, to measure self-judging bias. Never a number to report; set `0` to skip.
+- `HLE_JUDGE_BASE_URL` / `HLE_JUDGE_API_KEY` — optional; endpoint and key serving
+  the independent HLE judges, for when the endpoint under test doesn't serve them
+  (e.g. a self-hosted single-model deployment). Both default to `OPENAI_BASE_URL` /
+  `API_KEY`. The self-judge always uses the main endpoint.
 
 ## HLE grading
 
