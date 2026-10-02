@@ -10,6 +10,10 @@ set +a
 
 # lm-eval-style: .env stores MODEL_NAME as "openai/<provider>/<model>"; strip the leading "openai/".
 RAW_MODEL="${MODEL_NAME#openai/}"
+# Registers "<RAW_MODEL>-FC"/"-PROMPT" in bfcl_eval/constants/model_config.py
+# if BFCL doesn't know them yet, so any OpenAI-compatible model runs without
+# patching BFCL.
+export BFCL_MODEL="$RAW_MODEL"
 
 # --- BFCL harness paths ------------------------------------------------------
 BFCL_DIR="$WORKSPACE_DIR/BFCL/berkeley-function-call-leaderboard"
@@ -45,8 +49,9 @@ EOF
 #   PROMPT -> is_fc_model=False: functions stringified into a system prompt;
 #                                   the model emits text, BFCL parses it.
 #                                   Fallback for text-only endpoints.
-# Two config keys are registered in bfcl_eval/constants/model_config.py:
-#   "z-ai/glm-5.2-FC"      "z-ai/glm-5.2-PROMPT"
+# Both keys, "<RAW_MODEL>-FC" and "<RAW_MODEL>-PROMPT", exist for any model:
+# hand-written in bfcl_eval/constants/model_config.py for GLM-5.2 / Gemma-4,
+# registered at import from BFCL_MODEL (exported above) for everything else.
 BFCL_MODE="${BFCL_MODE:-FC}"   # FC | PROMPT
 case "$BFCL_MODE" in
   FC)     BFCL_MODEL_KEY="${RAW_MODEL}-FC" ;;
@@ -63,7 +68,7 @@ esac
 TEST_CATEGORY="${TEST_CATEGORY:-simple_python,multiple,parallel,parallel_multiple,irrelevance}"
 NUM_THREADS="${NUM_THREADS:-4}"
 TEMPERATURE="${TEMPERATURE:-0.0}"    # BFCL default 0.001; 0 for determinism
-export MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-8192}"
+export MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-65536}"
 # BFCL shares the OpenAI client default timeout; bump for slow endpoints.
 # GLM-5.2 streams reasoning tokens, but the OpenAI SDK timeout bounds the full
 # streamed generation; 90s is too tight for long CoT on tool-calling prompts.

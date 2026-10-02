@@ -11,6 +11,9 @@ set +a
 # lcb_runner's OpenAIRunner reads OPENAI_KEY (not OPENAI_API_KEY).
 # The OpenAI client picks up OPENAI_BASE_URL automatically from env.
 RAW_MODEL="${MODEL_NAME#openai/}"
+# Registers RAW_MODEL in lcb_runner/lm_styles.py if LCB doesn't know it yet,
+# so any OpenAI-compatible model runs without patching LCB.
+export LCB_MODEL="$RAW_MODEL"
 export OPENAI_KEY="$API_KEY"
 # OPENAI_BASE_URL is already exported by `source .env` (set -a).
 
@@ -28,7 +31,7 @@ SCENARIO="${SCENARIO:-codegeneration}"     # codegeneration|testoutputprediction
 RELEASE_VERSION="${RELEASE_VERSION:-release_latest}"
 N="${N:-1}"                                # samples per problem (pass@k); pass@1 needs n>=1
 TEMPERATURE="${TEMPERATURE:-0.0}"           # 0 for deterministic; LCB default is 0.2
-MAX_TOKENS="${MAX_TOKENS:-${MAX_GEN_TOKENS:-16384}}"
+MAX_TOKENS="${MAX_TOKENS:-${MAX_GEN_TOKENS:-65536}}"
 MULTIPROCESS="${MULTIPROCESS:-4}"           # parallel API requests
 TIMEOUT="${TIMEOUT:-6}"                     # eval timeout per test case (seconds)
 NUM_PROCESS_EVALUATE="${NUM_PROCESS_EVALUATE:-12}"
