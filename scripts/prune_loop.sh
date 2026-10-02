@@ -15,8 +15,9 @@ cd "$(dirname "$0")/.."
 
 RUN_ID="${RUN_ID:?set RUN_ID}"
 INTERVAL="${INTERVAL:-180}"
-PREDS="jobs/$RUN_ID/swebench-pro/preds/preds.json"
-EVAL_DIR="jobs/$RUN_ID/swebench-pro/eval"
+JOBS_ROOT="${JOBS_ROOT:-jobs}"
+PREDS="$JOBS_ROOT/$RUN_ID/swebench-pro/preds/preds.json"
+EVAL_DIR="$JOBS_ROOT/$RUN_ID/swebench-pro/eval"
 INSTANCES="SWE-bench_Pro-os/SWE-agent/data/instances.yaml"
 PYTHON=".venv-swebenchpro/bin/python"
 
@@ -24,7 +25,12 @@ while true; do
   if [[ -f "$PREDS" ]]; then
     gate=()
     # Only tighten to the eval gate once Phase 2 is actually running.
-    if pgrep -f "swe_bench_pro_eval\.py" >/dev/null 2>&1; then
+    # patches.json is written just before Phase 2 starts; check it too, since
+    # pgrep can't see the eval process when this runs as a sibling container.
+    # (On a resumed run it exists during Phase 1 as well, which only makes
+    # pruning more conservative.)
+    if [[ -f "$JOBS_ROOT/$RUN_ID/swebench-pro/patches.json" ]] \
+        || pgrep -f "swe_bench_pro_eval\.py" >/dev/null 2>&1; then
       gate=(--eval-dir "$EVAL_DIR")
     fi
     echo "--- $(date '+%F %T') /mnt $(df -h --output=pcent /mnt | tail -1 | tr -d ' ')"

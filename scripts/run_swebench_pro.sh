@@ -37,7 +37,10 @@ INSTANCES_YAML="$SWEBENCH_DIR/SWE-agent/data/instances.yaml"
 RAW_SAMPLE="$SWEBENCH_DIR/data/swebench_pro_raw_sample.jsonl"
 CONFIG="$WORKSPACE_DIR/tasks/swebench-pro/swebench_pro.yaml"
 
-OUT_DIR="$WORKSPACE_DIR/jobs/$RUN_ID/swebench-pro"
+# JOBS_ROOT must be the same absolute path the host docker daemon sees:
+# nested containers bind-mount subdirs of it (see docs/running-via-docker.md).
+JOBS_ROOT="${JOBS_ROOT:-$WORKSPACE_DIR/jobs}"
+OUT_DIR="$JOBS_ROOT/$RUN_ID/swebench-pro"
 PRED_DIR="$OUT_DIR/preds"
 PATCHES_JSON="$OUT_DIR/patches.json"
 EVAL_DIR="$OUT_DIR/eval"
@@ -60,7 +63,7 @@ DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-jefzda}"
 # Cost/step limits per Phase-1 instance (defaults match the shipped config).
 COST_LIMIT="${COST_LIMIT:-3.0}"
 STEP_LIMIT="${STEP_LIMIT:-250}"
-MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-32768}"
+MAX_GEN_TOKENS="${MAX_GEN_TOKENS:-65536}"
 # Seconds allowed for `docker run` including the image pull (upstream default
 # is 120s, too short for the multi-GB sweap images under parallel pulls).
 PULL_TIMEOUT="${PULL_TIMEOUT:-1800}"

@@ -19,10 +19,64 @@ API_KEY=${API_KEY}
 OPENAI_BASE_URL=${OPENAI_BASE_URL}
 MODEL_NAME=${MODEL_NAME}
 HF_TOKEN=${HF_TOKEN:-}
-HLE_MAIN_JUDGE=${HLE_MAIN_JUDGE:-}
-HLE_SECOND_JUDGE=${HLE_SECOND_JUDGE:-}
-HLE_SELF_JUDGE=${HLE_SELF_JUDGE:-}
 EOF
+
+# HLE judge knobs: only written when actually passed with -e. Writing an unset
+# one as an empty line is not neutral -- run_hle.sh reads HLE_SECOND_JUDGE=
+# (set but empty) as "no second judge", which silently dropped the default
+# cross-check judge in every container run.
+for _v in HLE_MAIN_JUDGE HLE_SECOND_JUDGE HLE_SELF_JUDGE \
+          HLE_JUDGE_BASE_URL HLE_JUDGE_API_KEY; do
+  if [[ -n "${!_v+x}" ]]; then
+    printf '%s=%s\n' "$_v" "${!_v}" >> /app/.env
+  fi
+done
+
+# --- Jobs dir ----------------------------------------------------------------
+# SWE-bench Pro eval and DeepSWE (pier) bind-mount subdirs of the jobs dir into
+# sibling containers via the host docker socket. The HOST daemon resolves those
+# source paths on the host, so a container-only path like /app/jobs/... makes
+# it silently mount an empty dir (entryscript exit 127, RewardFileNotFoundError).
+# Mount the jobs dir at the same absolute path inside and out:
+#   -v "$PWD/jobs:$PWD/jobs" -e JOBS_ROOT="$PWD/jobs"
+# /app/jobs then symlinks to it so every other benchmark lands there too.
+JOBS_ROOT="${JOBS_ROOT:-/app/jobs}"
+export JOBS_ROOT
+if [[ "$JOBS_ROOT" != /app/jobs ]]; then
+  if [[ ! -d "$JOBS_ROOT" ]]; then
+    echo "ERROR: JOBS_ROOT=$JOBS_ROOT is not a directory; mount it with" >&2
+    echo "  -v \"$JOBS_ROOT:$JOBS_ROOT\"" >&2
+    exit 1
+  fi
+  if mountpoint -q /app/jobs 2>/dev/null; then
+    echo "ERROR: both /app/jobs and JOBS_ROOT=$JOBS_ROOT are mounted; drop the /app/jobs mount." >&2
+    exit 1
+  fi
+  ln -sfn "$JOBS_ROOT" /app/jobs
+fi
+
+# Ask the host daemon to mount JOBS_ROOT into a throwaway container and check
+# it sees a marker we just wrote. Fails when the paths differ between here and
+# the host (e.g. the old `-v jobs:/app/jobs` mount).
+check_jobs_root_visible_to_host() {
+  local image marker ok=0
+  image="$(docker inspect -f '{{.Config.Image}}' "$HOSTNAME" 2>/dev/null)" || {
+    echo "WARNING: couldn't identify this container's image; skipping JOBS_ROOT host-visibility check." >&2
+    return 0
+  }
+  mkdir -p "$JOBS_ROOT"
+  marker=".host-visibility-probe-$HOSTNAME-$$"
+  : > "$JOBS_ROOT/$marker"
+  docker run --rm --network none -v "$JOBS_ROOT:/probe:ro" --entrypoint /bin/sh \
+    "$image" -c "test -f /probe/$marker" >/dev/null 2>&1 || ok=1
+  rm -f "$JOBS_ROOT/$marker"
+  if [[ $ok -ne 0 ]]; then
+    echo "ERROR: the host docker daemon can't see JOBS_ROOT=$JOBS_ROOT at the same path." >&2
+    echo "Nested containers would mount an empty dir and every instance would score 0." >&2
+    echo "Re-run with: -v \"\$PWD/jobs:\$PWD/jobs\" -e JOBS_ROOT=\"\$PWD/jobs\"" >&2
+    exit 1
+  fi
+}
 
 needs_docker() {
   case " $* " in
@@ -38,6 +92,7 @@ if needs_docker "$@"; then
     echo "Re-run with: -v /var/run/docker.sock:/var/run/docker.sock" >&2
     exit 1
   fi
+  check_jobs_root_visible_to_host
   case " $* " in
     *" agentic "*|*" swebench_pro "*|*run_swebench_pro.sh*)
       bash /app/deployment/prepare-swebench-pro-data.sh
