@@ -178,3 +178,11 @@ done
 echo "# Artifacts : jobs/$RUN_ID/{gpqa,mmlu_pro,hle,livecodebench,scicode,bfcl,swebench-pro,deepswe}/"
 echo "# Finished  : $(date -Is)"
 echo "############################################################"
+
+# Non-zero exit when any step failed, so CI (or a caller checking $?) sees a
+# red run instead of having to parse the summary above.
+for name in "${!RESULTS[@]}"; do
+  if [[ "${RESULTS[$name]}" != OK ]]; then
+    exit 1
+  fi
+done
