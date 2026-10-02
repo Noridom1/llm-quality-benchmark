@@ -1,0 +1,47 @@
+--- a/helper_code/generate_sweagent_instances.py	2026-09-29 08:43:03.670929332 +0000
++++ b/helper_code/generate_sweagent_instances.py	2026-09-29 08:43:03.702930447 +0000
+@@ -22,19 +22,20 @@
+ from create_problem_statement import create_problem_statement
+ 
+ 
+-def generate_instances(dockerhub_username, dataset_split='test'):
++def generate_instances(dockerhub_username, dataset_split='test', revision=None):
+     """
+     Load SWE-bench Pro dataset and generate instance list.
+     
+     Args:
+         dockerhub_username: Docker Hub username for image URI generation
+         dataset_split: Which split of the dataset to use (default: 'test')
++        revision: HF dataset git revision to load (default: latest)
+         
+     Returns:
+         list: List of instance dictionaries formatted for YAML output
+     """
+     print(f"Loading SWE-bench Pro dataset (split: {dataset_split})...")
+-    swebench_pro = load_dataset('ScaleAI/SWE-bench_Pro', split=dataset_split)
++    swebench_pro = load_dataset('ScaleAI/SWE-bench_Pro', split=dataset_split, revision=revision)
+     
+     instances = []
+     print(f"Processing {len(swebench_pro)} instances...")
+@@ -115,6 +116,12 @@
+         default='test',
+         help='Which split of the dataset to use (default: test)'
+     )
++
++    parser.add_argument(
++        '--revision',
++        default=None,
++        help='HF dataset git revision (commit sha/tag) to load (default: latest)'
++    )
+     
+     return parser.parse_args()
+ 
+@@ -124,7 +131,7 @@
+     args = parse_args()
+     
+     # Generate instances
+-    instances = generate_instances(args.dockerhub_username, args.dataset_split)
++    instances = generate_instances(args.dockerhub_username, args.dataset_split, args.revision)
+     
+     # Write to YAML file
+     write_yaml(instances, args.output_path)
