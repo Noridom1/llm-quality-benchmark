@@ -112,6 +112,20 @@ if [[ "$JUDGE_MODEL" == "$TESTED_MODEL" ]]; then
   fi
 fi
 
+# --- Judge endpoint -----------------------------------------------------------
+# An independent judge usually isn't served by the endpoint under test, so
+# HLE_JUDGE_BASE_URL/HLE_JUDGE_API_KEY (from .env) point it elsewhere. Both
+# fall back to the main endpoint. A self-judge is the model under test by
+# definition, so it always uses the main endpoint.
+if [[ "$JUDGE_MODEL" == "$TESTED_MODEL" ]]; then
+  JUDGE_BASE_URL="$OPENAI_BASE_URL"
+  JUDGE_API_KEY="$API_KEY"
+else
+  JUDGE_BASE_URL="${HLE_JUDGE_BASE_URL:-$OPENAI_BASE_URL}"
+  JUDGE_API_KEY="${HLE_JUDGE_API_KEY:-$API_KEY}"
+fi
+export JUDGE_BASE_URL JUDGE_API_KEY
+
 mkdir -p "$OUT_DIR"
 
 echo "=== HLE LLM-judge re-grade ==="
@@ -119,6 +133,7 @@ echo "  RUN_ID      : $RUN_ID"
 echo "  Source      : $SRC_DIR"
 echo "  Model tested: $TESTED_MODEL"
 echo "  Judge model : $JUDGE_MODEL"
+echo "  Judge URL   : $JUDGE_BASE_URL"
 echo "  Output      : $OUT_DIR"
 echo "  Verdict cache: $CACHE_DB"
 for s in "${SAMPLES[@]}"; do echo "  Samples     : ${s#$WORKSPACE_DIR/}"; done

@@ -304,10 +304,18 @@ def main():
     )
     args = ap.parse_args()
 
-    base_url = os.environ["OPENAI_BASE_URL"].rstrip("/")
+    # JUDGE_BASE_URL/JUDGE_API_KEY are set by judge_hle.sh when the judge is
+    # served somewhere other than the model under test (HLE_JUDGE_BASE_URL).
+    base_url = (
+        os.environ.get("JUDGE_BASE_URL") or os.environ["OPENAI_BASE_URL"]
+    ).rstrip("/")
     if not base_url.endswith("/chat/completions"):
         base_url += "/chat/completions"
-    api_key = os.environ.get("API_KEY") or os.environ["OPENAI_API_KEY"]
+    api_key = (
+        os.environ.get("JUDGE_API_KEY")
+        or os.environ.get("API_KEY")
+        or os.environ["OPENAI_API_KEY"]
+    )
 
     os.makedirs(args.out, exist_ok=True)
     cache = VerdictCache(args.cache)
@@ -516,6 +524,21 @@ def main():
     errors = [j for j in results if j.get("error")]
     if errors:
         print(f"  WARNING: {len(errors)} judge errors, e.g. {errors[0]['error'][:200]}")
+    # An unparseable reply is a verdict the judge failed to give (counted
+    # unjudged, expected now and then). A request that never got a reply --
+    # 404 unknown model, 401, connection refused -- means the score is
+    # incomplete, so fail loudly instead of reporting e.g. 0/0 as success.
+    # Re-running is cheap: verdicts already obtained come from the cache.
+    call_errors = [j for j in errors if j["error"] != "unparseable judge reply"]
+    judged_total = sum(s["judged"] for s in summary["tasks"].values())
+    if call_errors or not judged_total:
+        print(
+            f"  ERROR: {len(call_errors)} judge request(s) failed and "
+            f"{judged_total} verdict(s) obtained -- this score is incomplete. "
+            "Fix the judge endpoint/model and re-run; cached verdicts are reused.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
