@@ -1,0 +1,29 @@
+diff --git a/lcb_runner/lm_styles.py b/lcb_runner/lm_styles.py
+index e2fd53a..bc6eb8a 100644
+--- a/lcb_runner/lm_styles.py
++++ b/lcb_runner/lm_styles.py
+@@ -1,3 +1,4 @@
++import os
+ from dataclasses import dataclass
+ from datetime import datetime
+ from enum import Enum
+@@ -881,5 +882,19 @@ LanguageModelStore: dict[str, LanguageModel] = {
+     lm.model_name: lm for lm in LanguageModelList
+ }
+ 
++# Any model served behind an OpenAI-compatible endpoint can be run without
++# editing the list above: benchmarks/livecodebench/run.sh sets LCB_MODEL to the
++# --model name, and an unknown name is registered here as OpenAIChat.
++# release_date is metadata only on the codegeneration path (no problem filter
++# reads it), so a fixed placeholder is used, as for the entries above.
++_extra_model = os.environ.get("LCB_MODEL", "").strip()
++if _extra_model and _extra_model not in LanguageModelStore:
++    LanguageModelStore[_extra_model] = LanguageModel(
++        _extra_model,
++        _extra_model.replace("/", "_"),
++        LMStyle.OpenAIChat,
++        datetime(2024, 6, 30),
++    )
++
+ if __name__ == "__main__":
+     print(list(LanguageModelStore.keys()))

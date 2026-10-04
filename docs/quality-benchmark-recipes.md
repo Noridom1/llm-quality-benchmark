@@ -49,102 +49,103 @@ See the script's header comment for parallel-category launch (one tmux pane per 
 
 | Benchmark | Subset used | CCU | Measured wall clock | Note |
 | --- | --- | --- | --- | --- |
-| GPQA Diamond | full 198 câu, 5-shot CoT | 8 | ~58m | ổn định, dùng lại nguyên |
-| MMLU-Pro | 36 câu/subject (504/~11,000), 14 subject | 8 | ~37m | subsample do giới hạn chi phí, không đại diện đủ từng subject nhỏ |
-| HLE | 250/2,500 câu (tier Extended, text-only) | 6 (generate) / 6 (judge) | ~4h49m generate + ~5m judge | chấm bằng LLM-judge (deepseek-v4-pro), không dùng string-match thô — xem [[HLE note]] |
-| LiveCodeBench | scenario codegeneration, 199 bài, pass@1 (n=1, temp 0) | 4 | không log được (chỉ có mốc kết thúc) | nên thêm log start time ở lần chạy sau |
-| SciCode | split without_background, 30 bài | 8 | ~1h58m | chấm cả sub-step lẫn full-problem, chênh lệch lớn là bình thường |
-| BFCL v4 | đủ 13/13 category single-turn (7 non-live + 6 live), không multi-turn/agentic | 4 (mặc định script) | ~37m | có thể tăng CCU (script default thấp, chưa test giới hạn) |
-| SWE-bench Pro | full 200 instance | 4 (agent) / 4 (eval) | ~11h36m | benchmark dài nhất, chiếm phần lớn tổng wall clock |
-| DeepSWE | full 64 task | **8** (không dùng 16) | ~5h30m khi chạy tuần tự ở CCU8 | CCU 16 làm hết network pool Docker và fail ~1/3 trial (xem [[deepswe-ccu-docker-network-limit]]) — chốt CCU 8 cho lần chạy sau, đừng lặp lại lỗi này |
+| GPQA Diamond | full 198 questions, 5-shot CoT | 8 | ~58m | stable, reuse as is |
+| MMLU-Pro | 36 questions/subject (504/~11,000), 14 subjects | 8 | ~37m | subsampled due to cost limits, does not fully represent each small subject |
+| HLE | 250/2,500 questions (Extended tier, text-only) | 6 (generate) / 6 (judge) | ~4h49m generate + ~5m judge | scored by an LLM judge (deepseek-v4-pro), not raw string match — see [[HLE note]] |
+| LiveCodeBench | codegeneration scenario, 199 problems, pass@1 (n=1, temp 0) | 4 | not logged (only the end timestamp exists) | add a start-time log in future runs |
+| SciCode | without_background split, 30 problems | 8 | ~1h58m | scores both sub-steps and full problems; a large gap between them is normal |
+| BFCL v4 | all 13/13 single-turn categories (7 non-live + 6 live), no multi-turn/agentic | 4 (script default) | ~37m | CCU can be raised (the script default is low, the limit has not been tested) |
+| SWE-bench Pro | full 200 instances | 4 (agent) / 4 (eval) | ~11h36m | longest benchmark, takes most of the total wall clock |
+| DeepSWE | full 64 tasks | **8** (not 16) | ~5h30m when run sequentially at CCU 8 | CCU 16 exhausts the Docker network pool and fails ~1/3 of trials (see [[deepswe-ccu-docker-network-limit]]) — CCU 8 is fixed for future runs, do not repeat this mistake |
 
-**Tổng wall clock nếu chạy song song theo category** (như khuyến nghị ở trên): General (GPQA/MMLU-Pro/HLE) ~4h49m (do HLE kéo dài nhất), Coding (LCB/SciCode) ~1h58m, Agentic (BFCL/SWE-Pro/DeepSWE) ~11h36m (do SWE-bench Pro kéo dài nhất) — tổng 3 category chạy song song ~11h36m nếu đủ endpoint capacity cho cả 3 cùng lúc, hoặc cộng dồn ~18h nếu chạy tuần tự từng category.
+**Total wall clock if categories run in parallel** (as recommended above): General (GPQA/MMLU-Pro/HLE) ~4h49m (HLE is the longest), Coding (LCB/SciCode) ~1h58m, Agentic (BFCL/SWE-Pro/DeepSWE) ~11h36m (SWE-bench Pro is the longest) — about 11h36m total with all 3 categories in parallel if the endpoint has capacity for all 3 at once, or ~18h cumulative if categories run sequentially.
 
-### Lệnh chạy từng benchmark
+### Per-benchmark commands
 
-Chạy từ `/home/stackops/benchmark`, đã `source .env` (`OPENAI_BASE_URL`, `API_KEY`). Đổi `RUN_ID`/model theo model đang test. Các lệnh đánh dấu **(reconstructed)** là suy ra từ script + config đã ghi nhận (`results_*.json`/`config.json`), không có job.log ghi lại lệnh gốc thật — verify lại flag trước khi dùng cho model mới; lệnh **(confirmed)** là lấy nguyên văn từ job.log.
+Run from `<repo-root>` after `source .env` (`OPENAI_BASE_URL`, `API_KEY`). Change `RUN_ID`/model to match the model under test. Commands marked **(reconstructed)** are inferred from the scripts + recorded config (`results_*.json`/`config.json`); no job.log recorded the original command, so verify the flags before using them for a new model. Commands marked **(confirmed)** are taken verbatim from job.log.
 
 ```bash
-# GPQA Diamond — full 198 câu, CCU 8 (reconstructed)
+# GPQA Diamond — full 198 questions, CCU 8 (reconstructed)
 RUN_ID=<run-id> NUM_CONCURRENT=8 MAX_GEN_TOKS=65536 REQUEST_TIMEOUT=3600 \
-  bash scripts/run_gpqa.sh
+  bash benchmarks/gpqa/run.sh
 
-# MMLU-Pro — 36 câu/subject (504 tổng), CCU 8 (reconstructed)
+# MMLU-Pro — 36 questions/subject (504 total), CCU 8 (reconstructed)
 RUN_ID=<run-id> NUM_CONCURRENT=8 MAX_GEN_TOKS=65536 REQUEST_TIMEOUT=3600 LIMIT=36 \
-  bash scripts/run_mmlu_pro.sh
+  bash benchmarks/mmlu_pro/run.sh
 
-# HLE — 250/2,500 câu (125/subtask x 2), CCU 6, generate + judge tự động (reconstructed cho phần generate,
-# confirmed cho lệnh judge riêng trong JUDGE.md)
+# HLE — 250/2,500 questions (125/subtask x 2), CCU 6, generate + judge automatically (reconstructed for the generate part,
+# confirmed for the separate judge command in JUDGE.md)
 RUN_ID=<run-id> NUM_CONCURRENT=6 MAX_GEN_TOKS=65536 LIMIT=125 REQUEST_TIMEOUT=3600 \
-  bash scripts/run_hle.sh
-# nếu cần chạy judge riêng (đã có generation từ trước):
-RUN_ID=<run-id> ./scripts/judge_hle.sh                                # judge chính: deepseek/deepseek-v4-pro
-RUN_ID=<run-id> JUDGE_MODEL=qwen/qwen3.7-plus ./scripts/judge_hle.sh   # judge chéo kiểm chứng
-RUN_ID=<run-id> JUDGE_MODEL=<model đang test> ./scripts/judge_hle.sh   # self-judge kiểm tra bias
+  bash benchmarks/hle/run.sh
+# to run the judge separately (generations already exist):
+RUN_ID=<run-id> ./benchmarks/hle/judge.sh                                # primary judge: deepseek/deepseek-v4-pro
+RUN_ID=<run-id> JUDGE_MODEL=qwen/qwen3.7-plus ./benchmarks/hle/judge.sh   # cross-check judge
+RUN_ID=<run-id> JUDGE_MODEL=<model under test> ./benchmarks/hle/judge.sh   # self-judge to check bias
 
-# LiveCodeBench — scenario codegeneration, LIMIT=200 (kết quả n=199 do 1 bài bị loại), MULTIPROCESS=8
-# (confirmed từ tmux scrollback, sweep 2026-09-10 — trước ghi nhầm là chưa xác nhận CCU)
+# LiveCodeBench — codegeneration scenario, LIMIT=200 (result is n=199 because 1 problem was dropped), MULTIPROCESS=8
+# (confirmed from tmux scrollback, sweep 2026-09-10 — previously mislabeled as CCU unconfirmed)
 RUN_ID=<run-id> LIMIT=200 MULTIPROCESS=8 \
-  bash scripts/run_livecodebench.sh
+  bash benchmarks/livecodebench/run.sh
 
-# SciCode — split without_background, 30 bài, CCU 8, SAMPLE_SHUFFLE=42 (cố định seed để manifest tái lập được)
-# (confirmed từ tmux scrollback, sweep 2026-09-10 — trước thiếu SAMPLE_SHUFFLE/MAX_GEN_TOKENS)
+# SciCode — without_background split, 30 problems, CCU 8, SAMPLE_SHUFFLE=42 (fixed seed so the manifest is reproducible)
+# (confirmed from tmux scrollback, sweep 2026-09-10 — previously missing SAMPLE_SHUFFLE/MAX_GEN_TOKENS)
 RUN_ID=<run-id> LIMIT=30 MAX_CONNECTIONS=8 SAMPLE_SHUFFLE=42 MAX_GEN_TOKENS=65536 \
-  bash scripts/run_scicode.sh
+  bash benchmarks/scicode/run.sh
 
-# BFCL v4 — đủ 13/13 category single-turn, CCU 4 (reconstructed, chưa xác nhận được TEST_CATEGORY/NUM_THREADS
-# thật sự dùng — tmux history-limit 2000 dòng đã làm trôi mất lệnh gốc của lần chạy glm5.2-selfhost-extended,
-# kiểm tra lại category_mapping.py trước khi chạy cho model mới)
+# BFCL v4 — all 13/13 single-turn categories, CCU 4 (reconstructed; the TEST_CATEGORY/NUM_THREADS actually
+# used could not be confirmed — the tmux history-limit of 2000 lines scrolled away the original command of the glm5.2-selfhost-extended run;
+# re-check category_mapping.py before running for a new model)
 RUN_ID=<run-id> TEST_CATEGORY=single_turn \
-  bash scripts/run_bfcl.sh
+  bash benchmarks/bfcl/run.sh
 
-# SWE-bench Pro — 200 instance đầu (LIMIT=200, full là 731), CCU 4 agent / 4 eval (reconstructed từ
-# run_config.yaml + README — lệnh gốc cũng đã trôi khỏi tmux history do log quá dài, xem note BFCL ở trên)
+# SWE-bench Pro — first 200 instances (LIMIT=200, full is 731), CCU 4 agent / 4 eval (reconstructed from
+# run_config.yaml + README — the original command also scrolled out of tmux history because the log was too long, see the BFCL note above)
 RUN_ID=<run-id> WORKERS=4 EVAL_WORKERS=4 LIMIT=200 \
-  bash scripts/run_swebench_pro.sh
+  bash benchmarks/swebench_pro/run.sh
 
-# DeepSWE — full 64 task, gộp từ 3 batch chạy tuần tự (KHÔNG phải 1 lệnh "64 8" duy nhất — đã sửa sau khi
-# sweep tmux, doc cũ ghi sai). Batch 1 dùng run_deepswe.sh (N task đầu theo thứ tự mặc định), batch 2/3 dùng
-# run_deepswe_tasks.sh với danh sách task cụ thể để rerun đúng phần lỗi. Cả 3 dòng dưới đều (confirmed từ
-# tmux scrollback session deepswe-maas).
+# DeepSWE — full 64 tasks, merged from 3 batches run sequentially (NOT a single "64 8" command — corrected after
+# sweeping tmux; the old doc was wrong). Batch 1 used run.sh (the first N tasks in the default order); batches 2/3 used
+# run_tasks.sh with specific task lists to rerun exactly the failed part. The task list is a plain text file,
+# one task name per line (e.g. <your-task-list>.txt). All 3 lines below were (confirmed from the
+# tmux scrollback of session deepswe-maas); the original list files are no longer in the repo.
 RUN_ID=<run-id> MAX_GEN_TOKENS=65536 \
-  bash scripts/run_deepswe.sh 32 8                                          # batch 1: 32 task đầu, CCU 8
+  bash benchmarks/deepswe/run.sh 32 8                                          # batch 1: first 32 tasks, CCU 8
 RUN_ID=<run-id> MAX_GEN_TOKENS=65536 JOB_NAME=tasks33-64-ccu16 \
-  bash scripts/run_deepswe_tasks.sh deepswe_tasks_33_64.txt 16              # batch 2: task 33-64, CCU 16 — 10/32 lỗi network pool
+  bash benchmarks/deepswe/run_tasks.sh <your-task-list>.txt 16                 # batch 2: tasks 33-64, CCU 16 — 10/32 failed from the network pool
 RUN_ID=<run-id> MAX_GEN_TOKENS=65536 JOB_NAME=rerun10-ccu8 \
-  bash scripts/run_deepswe_tasks.sh deepswe_tasks_rerun10.txt 8            # batch 3: rerun đúng 10 task lỗi ở CCU 8
-# Khuyến nghị cho lần chạy sau: bỏ qua batch CCU16 nửa chừng, chạy thẳng CCU 8 cho toàn bộ 64 task ngay từ đầu
-# (xem [[deepswe-ccu-docker-network-limit]]) — 3-batch ở trên là lịch sử thật đã chạy, không phải cách nên lặp lại.
+  bash benchmarks/deepswe/run_tasks.sh <your-task-list>.txt 8                  # batch 3: rerun exactly the 10 failed tasks at CCU 8
+# Recommendation for future runs: skip the mid-way CCU 16 batch and run all 64 tasks at CCU 8 from the start
+# (see [[deepswe-ccu-docker-network-limit]]) — the 3 batches above are the real history of what was run, not something to repeat.
 ```
 
-### Lệnh chạy theo category (tuần tự trong mỗi category, fail cái trước không chặn cái sau)
+### Per-category commands (sequential within each category, an earlier failure does not block later ones)
 
-Mỗi category chạy các benchmark bên trong **tuần tự**, nối bằng **`;`** thay vì `&&` — benchmark sau vẫn chạy kể cả khi benchmark trước fail (exit ≠ 0). Lý do đổi: ngày 2026-09-11 GPQA crash giữa chừng (endpoint cắt SSE stream ~15 phút → TransferEncodingError hết retry) làm chết toàn bộ chain `&&`, MMLU-Pro/HLE không hề được chạy. Vì vậy sau khi chạy xong phải tự check riêng output từng benchmark trong `jobs/<run-id>/` — chuỗi `;` không còn báo fail tổng. Lưu ý: `;` chỉ chống lại *fail*; Ctrl+C giữa chừng vẫn dừng cả chuỗi như thường. 3 category có thể chạy song song với nhau nếu endpoint đủ tải (xem bảng CCU/cap ở trên).
+Each category runs its benchmarks **sequentially**, joined with **`;`** instead of `&&` — the next benchmark still runs even if the previous one fails (exit ≠ 0). Reason for the change: on 2026-09-11 GPQA crashed midway (the endpoint cut the SSE stream after ~15 minutes → TransferEncodingError after retries were exhausted), which killed the whole `&&` chain, so MMLU-Pro/HLE never ran. Therefore, after a run you must check each benchmark's output in `jobs/<run-id>/` yourself — a `;` chain no longer reports an overall failure. Note: `;` only protects against *failures*; Ctrl+C midway still stops the whole chain as usual. The 3 categories can run in parallel if the endpoint can handle the load (see the CCU/cap table above).
 
 ```bash
 # ── Category: General knowledge (GPQA -> MMLU-Pro -> HLE) ──
 RUN_ID=<run-id> NUM_CONCURRENT=8 MAX_GEN_TOKS=65536 REQUEST_TIMEOUT=3600 \
-  bash scripts/run_gpqa.sh ; \
+  bash benchmarks/gpqa/run.sh ; \
 RUN_ID=<run-id> NUM_CONCURRENT=8 MAX_GEN_TOKS=65536 REQUEST_TIMEOUT=3600 LIMIT=36 \
-  bash scripts/run_mmlu_pro.sh ; \
+  bash benchmarks/mmlu_pro/run.sh ; \
 RUN_ID=<run-id> NUM_CONCURRENT=6 MAX_GEN_TOKS=65536 LIMIT=125 REQUEST_TIMEOUT=3600 \
-  bash scripts/run_hle.sh
+  bash benchmarks/hle/run.sh
 
 # ── Category: Coding (LiveCodeBench -> SciCode) ──
 RUN_ID=<run-id> LIMIT=200 MULTIPROCESS=8 \
-  bash scripts/run_livecodebench.sh ; \
+  bash benchmarks/livecodebench/run.sh ; \
 RUN_ID=<run-id> LIMIT=30 MAX_CONNECTIONS=8 SAMPLE_SHUFFLE=42 MAX_GEN_TOKENS=65536 \
-  bash scripts/run_scicode.sh
+  bash benchmarks/scicode/run.sh
 
 # ── Category: Agentic coding (BFCL -> SWE-bench Pro -> DeepSWE) ──
 RUN_ID=<run-id> TEST_CATEGORY=single_turn MAX_GEN_TOKENS=65536 \
-  bash scripts/run_bfcl.sh ; \
+  bash benchmarks/bfcl/run.sh ; \
 RUN_ID=<run-id> WORKERS=4 EVAL_WORKERS=4 LIMIT=200 MAX_GEN_TOKENS=65536 \
-  bash scripts/run_swebench_pro.sh ; \
-RUN_ID=<run-id> MAX_GEN_TOKENS=65536 bash scripts/run_deepswe.sh 64 8
+  bash benchmarks/swebench_pro/run.sh ; \
+RUN_ID=<run-id> MAX_GEN_TOKENS=65536 bash benchmarks/deepswe/run.sh 64 8
 ```
 
-**Note:** thứ tự trong category Agentic đặt BFCL trước vì nhanh nhất, DeepSWE cuối cùng để chốt CCU 8 sau khi đã rảnh tay theo dõi (SWE-bench Pro chạy lâu nhất, ~11h36m, nên là bottleneck của category này chứ không phải thứ tự). Ở đây DeepSWE viết gọn thành 1 lệnh `64 8` (chạy thẳng full 64 task ở CCU8 ngay từ đầu) — khác với lịch sử thật đã chạy (3 batch CCU8/16/8 do dò CCU giữa chừng, xem phần "Lệnh chạy từng benchmark" ở trên); dùng bản gọn này cho model mới vì CCU8 đã được xác nhận là mức an toàn, không cần lặp lại việc dò CCU16 nữa. Trước khi chạy cho model mới, chạy thử ở tier Smoke để xác nhận các flag trên còn đúng với version script hiện tại — GPQA/MMLU-Pro/BFCL/SWE-bench Pro vẫn còn **(reconstructed)** vì lệnh gốc của lần chạy `glm5.2-selfhost-extended` đã trôi khỏi tmux history (history-limit 2000 dòng, log quá dài) khi sweep lại ngày 2026-09-10; LiveCodeBench và SciCode đã **(confirmed)** lại được từ tmux scrollback.
+**Note:** BFCL is placed first in the Agentic category because it is the fastest, and DeepSWE last so CCU 8 can be settled once you are free to monitor it (SWE-bench Pro runs longest, ~11h36m, so it is the bottleneck of this category, not the ordering). Here DeepSWE is written compactly as a single `64 8` command (run the full 64 tasks at CCU 8 from the start) — different from the real history (3 batches at CCU 8/16/8 because CCU was being probed midway, see the "Per-benchmark commands" section above); use this compact version for new models, since CCU 8 is confirmed as the safe level and there is no need to probe CCU 16 again. Before running for a new model, do a trial run at the Smoke tier to confirm the flags above are still valid for the current script version — GPQA/MMLU-Pro/BFCL/SWE-bench Pro are still **(reconstructed)** because the original commands of the `glm5.2-selfhost-extended` run scrolled out of tmux history (history-limit 2000 lines, log too long) when re-swept on 2026-09-10; LiveCodeBench and SciCode were re-**(confirmed)** from the tmux scrollback.
 
 ## Decision and report
 

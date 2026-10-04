@@ -1,5 +1,11 @@
 # Test Plan: `quality-bench:latest`
 
+> **Layout note:** the test cases below were executed against the image built from
+> commit `65544d1` (tag `testing`), where scripts lived under `scripts/run_<bench>.sh`.
+> After the repository restructure the same commands use `benchmarks/<bench>/run.sh`
+> (or just `<bench>`); the paths in this file have been updated accordingly. Re-run
+> the plan against the next tagged image before releasing it.
+
 The claim under test is that someone with only an endpoint, a model name and
 an API key can run any of the 8 benchmarks from this image. Each result must
 be real and resumable, and must land under `jobs/<RUN_ID>/<benchmark>/` on
@@ -67,7 +73,7 @@ Unless a case says otherwise, a case passes when **all** of these hold:
 | TC-01 | Endpoint is reachable and the key works | `curl -s -H "Authorization: Bearer $API_KEY" $OPENAI_BASE_URL/models` | 200; `MODEL_NAME` appears in the list |
 | TC-02 | The endpoint's context fits 65k output (R4) | Chat request with `max_tokens: 65536` and a short prompt | 200, no context-length error. If it fails, run the rest of Phase 1 with `-e MAX_GEN_TOKENS=<ctx-4096>` and log it as a deviation |
 | TC-03 | Required env missing | `docker run --rm $IMG` (no `-e`) | Exits ≠0 immediately with `API_KEY is required` |
-| TC-04 | Bad JOBS_ROOT | `docker run "${COMMON[@]/JOBS_ROOT=*/JOBS_ROOT=/nope}" $IMG scripts/run_gpqa.sh` | Exits 1: `JOBS_ROOT=/nope is not a directory` |
+| TC-04 | Bad JOBS_ROOT | `docker run "${COMMON[@]/JOBS_ROOT=*/JOBS_ROOT=/nope}" $IMG benchmarks/gpqa/run.sh` | Exits 1: `JOBS_ROOT=/nope is not a directory` |
 | TC-05 | Secrets never reach disk outside `.env` | After any Phase 1 run: `grep -rl "$API_KEY" jobs/$RUN_ID \| grep -v '/bfcl/.env$'` | No output. BFCL's own `.env` is expected, and nothing else may contain the key |
 
 ## Stage 1: smoke, one benchmark at a time (≈30–60 min total)
@@ -77,16 +83,16 @@ they get slower as you go down, so a broken image fails fast.
 
 | ID | Benchmark | Command | Result to check |
 |---|---|---|---|
-| TC-06 | GPQA | `docker run "${COMMON[@]}" -e LIMIT=4 -e NUM_CONCURRENT=2 $IMG scripts/run_gpqa.sh` | `jobs/$RUN_ID/gpqa/<model__esc>/results_*.json` → `gpqa_diamond_cot_n_shot` has `exact_match` and `n-samples` = 4 |
-| TC-07 | MMLU-Pro | `... -e LIMIT=2 -e NUM_CONCURRENT=4 $IMG scripts/run_mmlu_pro.sh` | `jobs/$RUN_ID/mmlu_pro/*/results_*.json`: 14 subjects × 2 = 28 samples, and an aggregate `mmlu_pro` score |
-| TC-08 | HLE (generation only) | `... -e LIMIT=3 -e SKIP_JUDGE=1 $IMG scripts/run_hle.sh` | `jobs/$RUN_ID/hle/*/samples_hle_{exact_match,multiple_choice}_*.jsonl`, 3 lines each, with non-empty responses |
-| TC-09 | HLE with judge endpoint | `... -e LIMIT=3 -e HLE_JUDGE_BASE_URL -e HLE_JUDGE_API_KEY -e HLE_SELF_JUDGE=0 $IMG scripts/run_hle.sh` | Both default judges run (main + second), each prints `Judge URL: <judge endpoint>`, `jobs/$RUN_ID/hle-judged/` has verdicts for all 6 samples, the comparison table prints, exit 0 |
+| TC-06 | GPQA | `docker run "${COMMON[@]}" -e LIMIT=4 -e NUM_CONCURRENT=2 $IMG benchmarks/gpqa/run.sh` | `jobs/$RUN_ID/gpqa/<model__esc>/results_*.json` → `gpqa_diamond_cot_n_shot` has `exact_match` and `n-samples` = 4 |
+| TC-07 | MMLU-Pro | `... -e LIMIT=2 -e NUM_CONCURRENT=4 $IMG benchmarks/mmlu_pro/run.sh` | `jobs/$RUN_ID/mmlu_pro/*/results_*.json`: 14 subjects × 2 = 28 samples, and an aggregate `mmlu_pro` score |
+| TC-08 | HLE (generation only) | `... -e LIMIT=3 -e SKIP_JUDGE=1 $IMG benchmarks/hle/run.sh` | `jobs/$RUN_ID/hle/*/samples_hle_{exact_match,multiple_choice}_*.jsonl`, 3 lines each, with non-empty responses |
+| TC-09 | HLE with judge endpoint | `... -e LIMIT=3 -e HLE_JUDGE_BASE_URL -e HLE_JUDGE_API_KEY -e HLE_SELF_JUDGE=0 $IMG benchmarks/hle/run.sh` | Both default judges run (main + second), each prints `Judge URL: <judge endpoint>`, `jobs/$RUN_ID/hle-judged/` has verdicts for all 6 samples, the comparison table prints, exit 0 |
 | TC-09b | HLE, judge unreachable | TC-09 without the two judge vars, on an endpoint that doesn't serve the judges | Exit 1, "score is incomplete", TC-08-style samples still intact under `jobs/$RUN_ID/hle/` |
-| TC-10 | LiveCodeBench | `... -e LIMIT=4 -e MULTIPROCESS=2 $IMG scripts/run_livecodebench.sh` | `jobs/$RUN_ID/livecodebench/output/<repr>/Scenario.codegeneration_1_0.0_eval.json` with `pass@1` and 4 problems |
+| TC-10 | LiveCodeBench | `... -e LIMIT=4 -e MULTIPROCESS=2 $IMG benchmarks/livecodebench/run.sh` | `jobs/$RUN_ID/livecodebench/output/<repr>/Scenario.codegeneration_1_0.0_eval.json` with `pass@1` and 4 problems |
 | TC-11 | LCB, unregistered model (R1) | TC-10 with a model **not** in the LCB patch, e.g. `-e MODEL_NAME=qwen/qwen3-32b` on an endpoint that serves it | Same as TC-10: no `KeyError`, `output/<model with / as _>/…_eval.json` has `pass@1` |
-| TC-12 | BFCL | `... -e NUM_THREADS=2 -e TEST_CATEGORY=simple_python $IMG scripts/run_bfcl.sh` | `jobs/$RUN_ID/bfcl/score/<key>/…simple_python…_score.json` with accuracy. Read the per-category json, **not** Overall Acc (see `bfcl-overall-acc-pitfall`). Must also pass for an unregistered `MODEL_NAME` (R2) |
+| TC-12 | BFCL | `... -e NUM_THREADS=2 -e TEST_CATEGORY=simple_python $IMG benchmarks/bfcl/run.sh` | `jobs/$RUN_ID/bfcl/score/<key>/…simple_python…_score.json` with accuracy. Read the per-category json, **not** Overall Acc (see `bfcl-overall-acc-pitfall`). Must also pass for an unregistered `MODEL_NAME` (R2) |
 | TC-13 | BFCL PROMPT mode | TC-12 plus `-e BFCL_MODE=PROMPT` | Same as TC-12, including for an unregistered `MODEL_NAME` |
-| TC-14 | SciCode | `... -e LIMIT=2 -e SPLIT=validation -e MAX_CONNECTIONS=2 $IMG scripts/run_scicode.sh` | `jobs/$RUN_ID/scicode/logs/*.eval` plus a printed sub-problem/main-problem accuracy. Shows the baked-in `test_data.h5` is there (no h5py file-not-found error) |
+| TC-14 | SciCode | `... -e LIMIT=2 -e SPLIT=validation -e MAX_CONNECTIONS=2 $IMG benchmarks/scicode/run.sh` | `jobs/$RUN_ID/scicode/logs/*.eval` plus a printed sub-problem/main-problem accuracy. Shows the baked-in `test_data.h5` is there (no h5py file-not-found error) |
 
 For each case, also check that the header the script prints shows the
 expected `Model`, `Endpoint` and `Max gen tokens: 65536`.
@@ -110,7 +116,7 @@ expected `Model`, `Endpoint` and `Max gen tokens: 65536`.
 |---|---|---|---|
 | TC-23 | `general` recipe | `docker run "${COMMON[@]}" $IMG general` | GPQA 198, MMLU-Pro 504, HLE 250 samples (+ judges). The summary prints `OK` for all three |
 | TC-24 | `coding` recipe | `docker run "${COMMON[@]}" $IMG coding` | LCB 200 problems, SciCode 30 test problems (seed 42), both `OK` |
-| TC-25 | BFCL recipe step | `docker run "${COMMON[@]}" -e TEST_CATEGORY=single_turn $IMG scripts/run_bfcl.sh` | 13 categories scored (3,641 cases) |
+| TC-25 | BFCL recipe step | `docker run "${COMMON[@]}" -e TEST_CATEGORY=single_turn $IMG benchmarks/bfcl/run.sh` | 13 categories scored (3,641 cases) |
 | TC-26 | Reproducibility vs. baseline | Run TC-23 to TC-25 on gemma4 (`google/gemma-4-31b-it`) | Scores within noise of `jobs/gemma4-31b-fp8/README.md`: GPQA 52.53%, MMLU-Pro 83.13%, HLE 12.4%. Baseline ran at the 65k recipe default, so the settings match |
 
 ## Phase 2 (planned): SWE-bench Pro and DeepSWE
@@ -120,15 +126,15 @@ must be at the **same path** (already in `COMMON`).
 
 | ID | Case | Command / How | Expected |
 |---|---|---|---|
-| TC-30 | Socket missing | `docker run "${COMMON[@]}" $IMG scripts/run_swebench_pro.sh` | Exits 1 with the "docker.sock isn't reachable" message, before any work |
+| TC-30 | Socket missing | `docker run "${COMMON[@]}" $IMG benchmarks/swebench_pro/run.sh` | Exits 1 with the "docker.sock isn't reachable" message, before any work |
 | TC-31 | Wrong jobs mount | `-v "$PWD/jobs:/app/jobs"` (no JOBS_ROOT) plus the socket, `agentic` | Exits 1: "host docker daemon can't see JOBS_ROOT" |
-| TC-32 | Dataset prep plus the HF pin | First SWE-bench Pro run on a fresh volume | `prepare-swebench-pro-data.sh` generates 731-row data at revision `7ab5114`, and a `.hf-revision` stamp exists |
-| TC-33 | SWE-bench Pro smoke | `-e LIMIT=4 -e WORKERS=2 -e EVAL_WORKERS=2 $IMG scripts/run_swebench_pro.sh` | `preds/preds.json` has 4 entries, `eval/` has 4 per-instance dirs plus `eval/eval_results.json`. Count resolved from `eval_results.json`, not stdout (`swebench-pro-metric-pitfalls`). No `return code: 127` |
-| TC-34 | DeepSWE smoke | `$IMG scripts/run_deepswe.sh 2 2` | 2 trials with a `result.json`, and no `RewardFileNotFoundError` or `ContextWindowExceededError` (R4) |
+| TC-32 | Dataset prep plus the HF pin | First SWE-bench Pro run on a fresh volume | `benchmarks/swebench_pro/prepare_data.sh` generates 731-row data at revision `7ab5114`, and a `.hf-revision` stamp exists |
+| TC-33 | SWE-bench Pro smoke | `-e LIMIT=4 -e WORKERS=2 -e EVAL_WORKERS=2 $IMG benchmarks/swebench_pro/run.sh` | `preds/preds.json` has 4 entries, `eval/` has 4 per-instance dirs plus `eval/eval_results.json`. Count resolved from `eval_results.json`, not stdout (`swebench-pro-metric-pitfalls`). No `return code: 127` |
+| TC-34 | DeepSWE smoke | `$IMG benchmarks/deepswe/run.sh 2 2` | 2 trials with a `result.json`, and no `RewardFileNotFoundError` or `ContextWindowExceededError` (R4) |
 | TC-35 | Resume | Rerun TC-33 and TC-34 | Finished instances and batches are skipped |
-| TC-36 | Prune loop sidecars | Start `scripts/prune_loop.sh` (SWE-bench Pro) and `scripts/prune_deepswe_loop.sh` (DeepSWE) in sibling containers during a run | Reclaim images only for completed instances. DeepSWE p3 (2 tasks): both trial images removed right after each finished, no leftovers, quality-bench untouched |
+| TC-36 | Prune loop sidecars | Start `benchmarks/swebench_pro/prune_loop.sh` (SWE-bench Pro) and `benchmarks/deepswe/prune_loop.sh` (DeepSWE) in sibling containers during a run | Reclaim images only for completed instances. DeepSWE p3 (2 tasks): both trial images removed right after each finished, no leftovers, quality-bench untouched |
 | TC-37 | Full `agentic` recipe | `docker run "${COMMON[@]}" -v /var/run/docker.sock:/var/run/docker.sock $IMG agentic` | BFCL, SWE-bench Pro (200, CCU 4) and DeepSWE (64, CCU 8) all `OK`. Infra failures are rerun, model failures are not (`benchmark-failure-attribution`) | Covered by TC-38 (`agentic` is one of its 3 categories).
-| TC-38 | Everything | `$IMG` (default CMD, all 8) | Summary lists all 8 benchmarks as `OK`. Verified with a reduced run (`imgtest-20261002-tc38b`): each of the 8 benchmarks run sequentially at CCU 4 on a small subset (GPQA 8, MMLU-Pro 2/subject, HLE 4/subtask, LCB 8, SciCode 4, BFCL `simple_python`, SWE-bench Pro 4, DeepSWE 4 tasks) -- all `rc=0`, total wall ~2h53m. Found a leftover-image race: the last DeepSWE trial finished right as the driver exited, so the periodic prune sidecar didn't get another cycle before being killed, leaving 2 stray images (~8GB). Fixed in `scripts/run_deepswe.sh`: it now runs `prune_deepswe_loop.sh --once` itself right after `pier run`/`pier job resume` returns, scoped to its own job dir, so cleanup no longer depends on an external sidecar's timing. Verified with a standalone 1-task run, no sidecar at all (`imgtest-20261002-fixcheck`): task passed (reward 1.0), rc=0, and the script's own final sweep removed both of its trial images immediately -- no leftovers. |
+| TC-38 | Everything | `$IMG` (default CMD, all 8) | Summary lists all 8 benchmarks as `OK`. Verified with a reduced run (`imgtest-20261002-tc38b`): each of the 8 benchmarks run sequentially at CCU 4 on a small subset (GPQA 8, MMLU-Pro 2/subject, HLE 4/subtask, LCB 8, SciCode 4, BFCL `simple_python`, SWE-bench Pro 4, DeepSWE 4 tasks) -- all `rc=0`, total wall ~2h53m. Found a leftover-image race: the last DeepSWE trial finished right as the driver exited, so the periodic prune sidecar didn't get another cycle before being killed, leaving 2 stray images (~8GB). Fixed in `benchmarks/deepswe/run.sh`: it now runs `prune_deepswe_loop.sh --once` itself right after `pier run`/`pier job resume` returns, scoped to its own job dir, so cleanup no longer depends on an external sidecar's timing. Verified with a standalone 1-task run, no sidecar at all (`imgtest-20261002-fixcheck`): task passed (reward 1.0), rc=0, and the script's own final sweep removed both of its trial images immediately -- no leftovers. |
 
 ## Reporting
 

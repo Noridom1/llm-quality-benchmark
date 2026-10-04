@@ -1,0 +1,282 @@
+From 447912d9cfcbc24e2c0408d3d198950814088f0c Mon Sep 17 00:00:00 2001
+From: Phúc. Nguyễn Lê Thịnh <phucnlt2@vng.com.vn>
+Date: Wed, 23 Sep 2026 08:18:02 +0000
+Subject: [PATCH] Add streamed OpenAI-compatible handler + custom model entries
+
+- Stream responses (OPENAI_STREAM, default on) so long CoT models like
+  GLM-5.2 don't idle-timeout mid-generation on a buffered response.
+- Reassemble streamed chunks into a ChatCompletion-shaped object, and
+  flatten assistant messages to plain dicts so multi-turn/memory
+  categories can replay them without hitting a JSON-serialization error.
+- Register z-ai/glm-5.2 and google/gemma-4-31b-it (FC + PROMPT) model
+  config entries for this endpoint.
+
+Local commit only, not pushed upstream.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ .../bfcl_eval/constants/model_config.py       |  48 ++++++
+ .../api_inference/openai_completion.py        | 145 +++++++++++++++++-
+ 2 files changed, 190 insertions(+), 3 deletions(-)
+
+diff --git a/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py b/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py
+index e42fe1c..8a8c030 100644
+--- a/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py
++++ b/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py
+@@ -1137,6 +1137,54 @@ api_inference_model_map = {
+         is_fc_model=False,
+         underscore_to_dot=False,
+     ),
++    "z-ai/glm-5.2-FC": ModelConfig(
++        model_name="z-ai/glm-5.2",
++        display_name="GLM-5.2 (FC, OpenAI-compatible)",
++        url="https://tokenplan.api.greennode.ai",
++        org="z-ai",
++        license="Proprietary",
++        model_handler=OpenAICompletionsHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=True,
++        underscore_to_dot=True,
++    ),
++    "google/gemma-4-31b-it-FC": ModelConfig(
++        model_name="google/gemma-4-31b-it",
++        display_name="Gemma-4-31B-it (FC, OpenAI-compatible)",
++        url="https://blog.google/technology/developers/gemma-3/",
++        org="Google",
++        license="gemma-terms-of-use",
++        model_handler=OpenAICompletionsHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=True,
++        underscore_to_dot=True,
++    ),
++    "google/gemma-4-31b-it-PROMPT": ModelConfig(
++        model_name="google/gemma-4-31b-it",
++        display_name="Gemma-4-31B-it (Prompt, OpenAI-compatible)",
++        url="https://blog.google/technology/developers/gemma-3/",
++        org="Google",
++        license="gemma-terms-of-use",
++        model_handler=OpenAICompletionsHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=False,
++        underscore_to_dot=False,
++    ),
++    "z-ai/glm-5.2-PROMPT": ModelConfig(
++        model_name="z-ai/glm-5.2",
++        display_name="GLM-5.2 (Prompt, OpenAI-compatible)",
++        url="https://tokenplan.api.greennode.ai",
++        org="z-ai",
++        license="Proprietary",
++        model_handler=OpenAICompletionsHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=False,
++        underscore_to_dot=False,
++    ),
+     "glm-4.6-FC": ModelConfig(
+         model_name="glm-4.6",
+         display_name="GLM-4.6 (FC thinking)",
+diff --git a/berkeley-function-call-leaderboard/bfcl_eval/model_handler/api_inference/openai_completion.py b/berkeley-function-call-leaderboard/bfcl_eval/model_handler/api_inference/openai_completion.py
+index 357584f..19b1580 100644
+--- a/berkeley-function-call-leaderboard/bfcl_eval/model_handler/api_inference/openai_completion.py
++++ b/berkeley-function-call-leaderboard/bfcl_eval/model_handler/api_inference/openai_completion.py
+@@ -1,6 +1,7 @@
+ import json
+ import os
+ import time
++from types import SimpleNamespace
+ from typing import Any
+ 
+ from bfcl_eval.constants.type_mappings import GORILLA_TO_OPENAPI
+@@ -16,6 +17,130 @@ from bfcl_eval.model_handler.utils import (
+     system_prompt_pre_processing_chat_model,
+ )
+ from openai import OpenAI, RateLimitError
++from openai.types.chat.chat_completion_message import ChatCompletionMessage
++from openai.types.chat.chat_completion_message_tool_call import (
++    ChatCompletionMessageToolCall,
++)
++
++
++# Stream GLM-5.2 reasoning tokens so the connection stays alive (token frames
++# reset server/LB idle timers) instead of blocking on a single buffered
++# response that idle-timeouts mid-CoT. Set OPENAI_STREAM="0" to disable.
++_STREAM = os.getenv("OPENAI_STREAM", "1") != "0"
++
++
++def _accumulate_stream(stream) -> Any:
++    """Fold a stream of ChatCompletionChunk into a SimpleNamespace shaped like a
++    ChatCompletion so BFCL's downstream readers (``choices[0].message.{content,
++    tool_calls,reasoning_content}``, ``usage``) work unchanged.
++
++    The GLM endpoint emits no usage chunk, so usage defaults to None (readers
++    guard for it). Tool-call deltas arrive fragmented across chunks and are
++    reassembled by index into complete tool_call objects.
++    """
++    content_parts: list[str] = []
++    reasoning_parts: list[str] = []
++    tool_calls: dict[int, dict] = {}
++    role = None
++    finish_reason = None
++    model = None
++    id_ = None
++    usage = None
++    for chunk in stream:
++        if not getattr(chunk, "choices", None):
++            continue
++        id_ = id_ or getattr(chunk, "id", None)
++        model = model or getattr(chunk, "model", None)
++        if getattr(chunk, "usage", None):
++            usage = chunk.usage
++        choice = chunk.choices[0]
++        delta = choice.delta
++        if delta is None:
++            continue
++        if getattr(delta, "role", None):
++            role = delta.role
++        if getattr(delta, "content", None):
++            content_parts.append(delta.content)
++        rc = getattr(delta, "reasoning_content", None)
++        if rc:
++            reasoning_parts.append(rc)
++        if getattr(choice, "finish_reason", None):
++            finish_reason = choice.finish_reason
++        if getattr(delta, "tool_calls", None):
++            for tc in delta.tool_calls:
++                idx = tc.index if tc.index is not None else 0
++                slot = tool_calls.setdefault(
++                    idx,
++                    ChatCompletionMessageToolCall(
++                        id="", type="function",
++                        function={"name": "", "arguments": ""},
++                    ),
++                )
++                if tc.id:
++                    slot.id = tc.id
++                if getattr(tc, "type", None):
++                    slot.type = tc.type
++                if tc.function:
++                    if tc.function.name:
++                        slot.function.name += tc.function.name
++                    if tc.function.arguments:
++                        slot.function.arguments += tc.function.arguments
++    # Real ChatCompletionMessage/ToolCall (not SimpleNamespace): multi-turn
++    # categories (memory, multi_turn_*) feed this object straight back into
++    # the next request's `messages` list (base_handler._add_assistant_message_FC),
++    # and only a real pydantic BaseModel serializes there -- a bare
++    # SimpleNamespace raises "Object of type SimpleNamespace is not JSON
++    # serializable" on the following turn's API call.
++    message = ChatCompletionMessage(
++        role=role or "assistant",
++        content="".join(content_parts),
++        reasoning_content="".join(reasoning_parts) if reasoning_parts else None,
++        tool_calls=[
++            tool_calls[k] for k in sorted(tool_calls)
++        ] or None,
++    )
++    choice_ns = SimpleNamespace(index=0, message=message, finish_reason=finish_reason or "stop")
++    # The GLM endpoint emits no usage chunk; BFCL readers access
++    # usage.prompt_tokens / usage.completion_tokens unconditionally, so default
++    # to zeros rather than None.
++    if usage is None:
++        usage = SimpleNamespace(prompt_tokens=0, completion_tokens=0, total_tokens=0)
++    return SimpleNamespace(
++        id=id_, model=model, choices=[choice_ns], usage=usage,
++    )
++
++
++def _assistant_message_to_dict(message: Any) -> dict:
++    """Flatten an assistant message into a plain, JSON-serializable dict for the
++    chat history.
++
++    ``_accumulate_stream`` returns ``SimpleNamespace`` instead of the SDK's
++    pydantic ``ChatCompletionMessage``, and only the latter can be serialized by
++    the openai client when the message is replayed in ``messages``. Multi-step
++    categories (memory_*, multi_turn_*) do replay the assistant turn, so the raw
++    response object has to be flattened here rather than stored as-is.
++
++    ``reasoning_content`` is dropped on purpose: the endpoint does not accept it
++    back, and BFCL logs it separately via ``response_data["reasoning_content"]``.
++    """
++    assistant_message: dict = {
++        "role": getattr(message, "role", None) or "assistant",
++        "content": getattr(message, "content", None),
++    }
++    tool_calls = getattr(message, "tool_calls", None)
++    if tool_calls:
++        assistant_message["tool_calls"] = [
++            {
++                "id": tool_call.id,
++                "type": getattr(tool_call, "type", None) or "function",
++                "function": {
++                    "name": tool_call.function.name,
++                    "arguments": tool_call.function.arguments,
++                },
++            }
++            for tool_call in tool_calls
++        ]
++    return assistant_message
+ 
+ 
+ class OpenAICompletionsHandler(BaseHandler):
+@@ -68,8 +193,16 @@ class OpenAICompletionsHandler(BaseHandler):
+ 
+     @retry_with_backoff(error_type=RateLimitError)
+     def generate_with_backoff(self, **kwargs):
++        kwargs.setdefault("max_tokens", int(os.getenv("MAX_GEN_TOKENS", "8192")))
+         start_time = time.time()
+-        api_response = self.client.chat.completions.create(**kwargs)
++        if _STREAM and kwargs.get("stream"):
++            # stream=True returns an iterator; accumulate into a ChatCompletion-
++            # shaped object so _parse_query_response_* read it unchanged.
++            stream = self.client.chat.completions.create(**kwargs)
++            api_response = _accumulate_stream(stream)
++        else:
++            kwargs.pop("stream", None)
++            api_response = self.client.chat.completions.create(**kwargs)
+         end_time = time.time()
+ 
+         return api_response, end_time - start_time
+@@ -86,6 +219,7 @@ class OpenAICompletionsHandler(BaseHandler):
+             "model": self.model_name,
+             "temperature": self.temperature,
+             "store": False,
++            "stream": _STREAM,
+         }
+ 
+         if len(tools) > 0:
+@@ -119,7 +253,9 @@ class OpenAICompletionsHandler(BaseHandler):
+             model_responses = api_response.choices[0].message.content
+             tool_call_ids = []
+ 
+-        model_responses_message_for_chat_history = api_response.choices[0].message
++        model_responses_message_for_chat_history = _assistant_message_to_dict(
++            api_response.choices[0].message
++        )
+ 
+         return {
+             "model_responses": model_responses,
+@@ -223,6 +359,7 @@ class OpenAICompletionsHandler(BaseHandler):
+             model=self.model_name,
+             temperature=self.temperature,
+             store=False,
++            stream=_STREAM,
+         )
+ 
+     def _pre_query_processing_prompting(self, test_entry: dict) -> dict:
+@@ -238,7 +375,9 @@ class OpenAICompletionsHandler(BaseHandler):
+     def _parse_query_response_prompting(self, api_response: Any) -> dict:
+         return {
+             "model_responses": api_response.choices[0].message.content,
+-            "model_responses_message_for_chat_history": api_response.choices[0].message,
++            "model_responses_message_for_chat_history": _assistant_message_to_dict(
++                api_response.choices[0].message
++            ),
+             "input_token": api_response.usage.prompt_tokens,
+             "output_token": api_response.usage.completion_tokens,
+         }
+-- 
+2.34.1
+

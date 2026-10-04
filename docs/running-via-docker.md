@@ -108,17 +108,17 @@ docker run --rm -it \
   -e RUN_ID \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  --entrypoint bash quality-bench:latest scripts/prune_loop.sh
+  --entrypoint bash quality-bench:latest benchmarks/swebench_pro/prune_loop.sh
 ```
 
 Note this is opt-in, not automatic: nothing in `entrypoint.sh` starts a prune
 loop on its own for any category, including `agentic`/`swebench_pro` --
 you launch it yourself as a second, sibling `docker run` exactly as above,
-the same as running `bash scripts/prune_loop.sh` in its own pane locally.
+the same as running `bash benchmarks/swebench_pro/prune_loop.sh` in its own pane locally.
 
 ### DeepSWE resume
 
-Re-running `scripts/run_deepswe.sh` with the same `RUN_ID`, task count and CCU
+Re-running `benchmarks/deepswe/run.sh` with the same `RUN_ID`, task count and CCU
 resumes the job. pier skips trials that already have a `result.json`, even ones
 that died of infra errors, so the script first removes trials whose error type is
 in `RETRY_ERROR_TYPES` (default `RuntimeError CancelledError`) and reruns them.
@@ -135,12 +135,12 @@ chars>`, so each run creates fresh `<trial>-main` / `-pier-egress-proxy` tags
 that nothing ever removes -- 304 of them (159GB reclaimable) had piled up on the
 test host.
 
-`scripts/run_deepswe.sh` now cleans up after itself: right after its `pier
+`benchmarks/deepswe/run.sh` now cleans up after itself: right after its `pier
 run`/`pier job resume` call returns (success or failure), it does one
-`scripts/prune_deepswe_loop.sh --once` pass scoped to its own `JOBS_DIR`, when
+`benchmarks/deepswe/prune_loop.sh --once` pass scoped to its own `JOBS_DIR`, when
 every trial -- including whichever one finished last -- is guaranteed done. So
-even a lone `docker run ... scripts/run_deepswe.sh` with no sidecar leaves no
-leftover images. Run `scripts/prune_deepswe_loop.sh` in a spare pane anyway for
+even a lone `docker run ... benchmarks/deepswe/run.sh` with no sidecar leaves no
+leftover images. Run `benchmarks/deepswe/prune_loop.sh` in a spare pane anyway for
 a long multi-trial job, to reclaim disk incrementally *during* the run instead
 of only at the very end:
 
@@ -149,7 +149,7 @@ docker run --rm -it \
   -e RUN_ID \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  --entrypoint bash quality-bench:latest scripts/prune_deepswe_loop.sh
+  --entrypoint bash quality-bench:latest benchmarks/deepswe/prune_loop.sh
 ```
 
 - It removes a trial's images only once that trial has a `result.json`, and only
@@ -170,7 +170,7 @@ CCU/cap table in `quality-benchmark-recipes.md`.
 
 ## Running a single benchmark directly
 
-Bypasses `run_main_benchmark.sh` entirely; any `scripts/run_*.sh` works, with
+Bypasses `run_main_benchmark.sh` entirely; any `benchmarks/<name>/run.sh` works (or just the benchmark name), with
 its own overrides passed as ordinary `-e` flags. The exact vetted flags per
 benchmark (subset size, CCU, `MAX_GEN_TOKENS`) are encoded in
 `scripts/run_main_benchmark.sh`'s `run_general`/`run_coding`/`run_agentic`
@@ -182,7 +182,7 @@ docker run --rm -it \
   -e API_KEY -e OPENAI_BASE_URL -e MODEL_NAME -e RUN_ID -e HF_TOKEN \
   -e NUM_CONCURRENT=8 -e REQUEST_TIMEOUT=3600 \
   -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  quality-bench:latest scripts/run_gpqa.sh
+  quality-bench:latest benchmarks/gpqa/run.sh
 ```
 
 ```bash
@@ -192,7 +192,7 @@ docker run --rm -it \
   -e WORKERS=4 -e EVAL_WORKERS=4 -e LIMIT=200 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  quality-bench:latest scripts/run_swebench_pro.sh
+  quality-bench:latest benchmarks/swebench_pro/run.sh
 ```
 
 ## Smoke testing with a handful of samples
@@ -202,13 +202,13 @@ docker run --rm -it \
 sizes/CCU so campaigns stay comparable (see its own header comment: "Do not
 change subset sizes, CCU, or `MAX_GEN_TOKENS` here without a reason"), so most
 of its `run_step` calls hardcode their own `LIMIT`/`TEST_CATEGORY`
-(`env ... LIMIT=36 bash scripts/run_mmlu_pro.sh`, etc.) -- an external
+(`env ... LIMIT=36 bash benchmarks/mmlu_pro/run.sh`, etc.) -- an external
 `-e LIMIT=5` on `docker run` gets shadowed by that inner `env LIMIT=36` for
 every benchmark except GPQA, which is the one call without a hardcoded
 `LIMIT`. Passing `-e LIMIT=` to a full/category run will silently *not* do
 what you expect.
 
-For a real smoke test, invoke each `scripts/run_*.sh` directly (same pattern
+For a real smoke test, invoke each `benchmarks/<name>/run.sh` directly (same pattern
 as "Running a single benchmark directly" above) with a small sample count.
 The var that controls sample count differs per benchmark:
 
@@ -226,18 +226,18 @@ docker run --rm -it \
   -e API_KEY -e OPENAI_BASE_URL -e MODEL_NAME -e RUN_ID -e HF_TOKEN \
   -e LIMIT=4 -e NUM_CONCURRENT=1 \
   -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  quality-bench:latest scripts/run_gpqa.sh
+  quality-bench:latest benchmarks/gpqa/run.sh
 
 docker run --rm -it \
   -e API_KEY -e OPENAI_BASE_URL -e MODEL_NAME -e RUN_ID -e HF_TOKEN \
   -e LIMIT=4 -e WORKERS=1 \
   -v /var/run/docker.sock:/var/run/docker.sock -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  quality-bench:latest scripts/run_swebench_pro.sh
+  quality-bench:latest benchmarks/swebench_pro/run.sh
 
 docker run --rm -it \
   -e API_KEY -e OPENAI_BASE_URL -e MODEL_NAME -e RUN_ID -e HF_TOKEN \
   -v /var/run/docker.sock:/var/run/docker.sock -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  quality-bench:latest scripts/run_deepswe.sh 1 1
+  quality-bench:latest benchmarks/deepswe/run.sh 1 1
 ```
 
 The repo already has a dedicated all-8, one-sample-count-per-benchmark smoke
@@ -263,14 +263,14 @@ when running it locally):
 - `entrypoint.sh`'s `needs_docker()` check greps the **literal argv**
   for `agentic`/`swebench_pro`/`deepswe`/`run_swebench_pro.sh`/`run_deepswe`
   to decide whether to preflight `docker info` and auto-run
-  `prepare-swebench-pro-data.sh`. Since the argv here is just
+  `benchmarks/swebench_pro/prepare_data.sh`. Since the argv here is just
   `scripts/run_all_smoke_sequential.sh`, that check doesn't fire even though
   the script's own SWE-bench Pro/DeepSWE legs need the socket. Always pass
   `-v /var/run/docker.sock:/var/run/docker.sock` yourself when using this
   script, and make sure `SWE-agent/data/instances.yaml` +
   `SWE-bench_Pro-os/data/swebench_pro_raw_sample.jsonl` already exist (from a
   mounted `swebench-pro-data`/`swebench-pro-agent-data` volume, or run
-  `deployment/prepare-swebench-pro-data.sh` yourself first) -- otherwise its
+  `benchmarks/swebench_pro/prepare_data.sh` yourself first) -- otherwise its
   SWE-bench Pro leg fails on missing data instead of generating it.
 
 ## Rerun / continue a run
@@ -302,13 +302,13 @@ docker run --rm -it \
   -e API_KEY -e OPENAI_BASE_URL -e MODEL_NAME -e RUN_ID -e HF_TOKEN \
   -e FILTER='django__django-1234|astropy__astropy-5678' \
   -v /var/run/docker.sock:/var/run/docker.sock -v "$(pwd)/jobs:$(pwd)/jobs" -e JOBS_ROOT="$(pwd)/jobs" \
-  quality-bench:latest scripts/run_swebench_pro.sh
+  quality-bench:latest benchmarks/swebench_pro/run.sh
 
 # Force re-running Phase 1 even for instances with an existing prediction
-docker run ... -e REDO_EXISTING=1 ... quality-bench:latest scripts/run_swebench_pro.sh
+docker run ... -e REDO_EXISTING=1 ... quality-bench:latest benchmarks/swebench_pro/run.sh
 
 # Force re-running Phase 2 eval even for instances with an existing output
-docker run ... -e REDO_EVAL=1 ... quality-bench:latest scripts/run_swebench_pro.sh
+docker run ... -e REDO_EVAL=1 ... quality-bench:latest benchmarks/swebench_pro/run.sh
 ```
 
 Before rerunning anything, check whether the failure was infra (disk-full,
@@ -353,7 +353,7 @@ container at all:
 
 ```bash
 bash scripts/progress.sh          # from the host checkout, same jobs/ dir
-RUN_ID=$RUN_ID bash scripts/watch_run.sh   # SWE-bench Pro-specific liveness/disk watcher
+RUN_ID=$RUN_ID bash benchmarks/swebench_pro/watch_run.sh   # SWE-bench Pro-specific liveness/disk watcher
 ```
 
 ## Viewing results

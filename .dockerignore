@@ -31,6 +31,7 @@ InferenceX
 jobs
 logs
 reports
+results
 
 .git
 .env

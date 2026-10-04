@@ -5,12 +5,12 @@
 # usage contract.
 #
 # Layout mirrors the local repo exactly (BFCL/, LiveCodeBench/, SciCode/,
-# SWE-bench_Pro-os/, deep-swe/, scripts/, tasks/ all under /app) so every
-# scripts/run_*.sh works completely unmodified inside the container.
+# SWE-bench_Pro-os/, deep-swe/, benchmarks/, scripts/ all under /app) so every
+# benchmarks/<name>/run.sh works completely unmodified inside the container.
 #
 # Each patched benchmark is rebuilt from a fresh upstream clone at the exact
 # commit our local changes are based on, with the corresponding patch under
-# patches/ applied on top -- NOT copied from the local checkout. This keeps
+# benchmarks/<name>/patches/ applied on top -- NOT copied from the local checkout. This keeps
 # the image reproducible from tracked source (git commit + patch file)
 # instead of whatever incidental local state happens to be on disk. The one
 # exception is deep-swe/, which has no upstream remote (see its own git
@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # each task's environment; without this plugin the `docker` CLI doesn't
 # recognize the `compose` subcommand at all, and every DeepSWE trial fails
 # immediately with a RuntimeError before the agent ever runs.
-# procps provides pgrep, used by scripts/watch_run.sh and prune_loop.sh.
+# procps provides pgrep, used by benchmarks/swebench_pro/watch_run.sh and prune_loop.sh.
 
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
 ENV UV_LINK_MODE=copy
@@ -52,12 +52,12 @@ RUN uv python install 3.10 3.11 3.12
 # --- bfcl: BFCL v4 (Python 3.10) --------------------------------------------
 FROM base AS bfcl
 WORKDIR /app
-# Base commit + patch per patches/bfcl/*.patch (`From <hash>` line).
+# Base commit + patch per benchmarks/bfcl/patches/*.patch (`From <hash>` line).
 RUN git clone --filter=blob:none https://github.com/ShishirPatil/gorilla.git /tmp/gorilla \
     && cd /tmp/gorilla && git checkout 6ea5797 \
     && mkdir -p /app/BFCL && mv berkeley-function-call-leaderboard /app/BFCL/ \
     && rm -rf /tmp/gorilla
-COPY patches/bfcl/ /tmp/patches-bfcl/
+COPY benchmarks/bfcl/patches/ /tmp/patches-bfcl/
 # The patch's diff paths are rooted at the gorilla monorepo checkout (the
 # local repo this was extracted from had its .git at BFCL/, one level above
 # berkeley-function-call-leaderboard/), so apply from /app/BFCL, not from
@@ -84,15 +84,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # --- lcb: LiveCodeBench (Python 3.11) ---------------------------------------
 FROM base AS lcb
 WORKDIR /app
-# Base commit + patch per patches/livecodebench/*.patch.
+# Base commit + patch per benchmarks/livecodebench/patches/*.patch.
 RUN git clone --filter=blob:none https://github.com/LiveCodeBench/LiveCodeBench.git /app/LiveCodeBench \
     && cd /app/LiveCodeBench && git checkout 28fef95
-COPY patches/livecodebench/ /tmp/patches-lcb/
+COPY benchmarks/livecodebench/patches/ /tmp/patches-lcb/
 RUN cd /app/LiveCodeBench && git apply /tmp/patches-lcb/*.patch && rm -rf /tmp/patches-lcb
 WORKDIR /app/LiveCodeBench
 # pyproject.toml declares torch>=2.3.0/vllm>=0.5.0.post1 as hard deps, but
 # they're only used for local-model inference; the OpenAI-API codegeneration
-# path scripts/run_livecodebench.sh actually uses (oai_runner.py) never
+# path benchmarks/livecodebench/run.sh actually uses (oai_runner.py) never
 # imports them. The locally-vetted venv confirms this (no torch/vllm
 # installed, works fine) -- so install with --no-deps + the actual runtime
 # dependency set instead of a plain `-e .`, which would otherwise pull
@@ -122,8 +122,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && uv pip install --python /app/.venv-scicode/bin/python -e . openai==3.3.1
 # openai: SciCode doesn't pin it, and the resolver picks 2.x, but inspect_ai's
 # OpenAI provider refuses to start below 3.1.0 (the local venv has 3.3.1).
-# The venv lives at /app/.venv-scicode, not inside SciCode/: scripts/run_scicode.sh
-# (and retry_/ci_run_scicode.sh) call $WORKSPACE_DIR/.venv-scicode/bin/inspect,
+# The venv lives at /app/.venv-scicode, not inside SciCode/: benchmarks/scicode/run.sh
+# (and retry.sh/ci_run.sh) call $WORKSPACE_DIR/.venv-scicode/bin/inspect,
 # matching the local layout.
 # test_data.h5 has no programmatic source (SciCode's README: manual Google
 # Drive download) -- copied from the build context, see .dockerignore.
@@ -135,8 +135,8 @@ WORKDIR /app
 RUN git clone --filter=blob:none https://github.com/scaleapi/SWE-bench_Pro-os.git /app/SWE-bench_Pro-os \
     && cd /app/SWE-bench_Pro-os && git checkout ca10a60
 # Adds --revision to generate_sweagent_instances.py so the HF dataset can be
-# pinned (see SWEBENCH_PRO_HF_REVISION in prepare-swebench-pro-data.sh).
-COPY patches/swebench-pro/ /tmp/patches-swbp/
+# pinned (see SWEBENCH_PRO_HF_REVISION in benchmarks/swebench_pro/prepare_data.sh).
+COPY benchmarks/swebench_pro/patches/swe-bench-pro/ /tmp/patches-swbp/
 RUN cd /app/SWE-bench_Pro-os && git apply /tmp/patches-swbp/*.patch && rm -rf /tmp/patches-swbp
 
 # SWE-agent submodule: unmodified, pinned exactly per .gitmodules. Only
@@ -154,7 +154,7 @@ RUN cd /app/SWE-bench_Pro-os \
 RUN cd /app/SWE-bench_Pro-os \
     && git clone --filter=blob:none https://github.com/scaleapi/mini-swe-agent mini-swe-agent \
     && cd mini-swe-agent && git checkout d74716a
-COPY patches/swebench-pro-mini-swe-agent/ /tmp/patches-mswea/
+COPY benchmarks/swebench_pro/patches/mini-swe-agent/ /tmp/patches-mswea/
 RUN cd /app/SWE-bench_Pro-os/mini-swe-agent \
     && git apply /tmp/patches-mswea/*.patch \
     && rm -rf /tmp/patches-mswea
@@ -168,7 +168,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # NOTE: SWE-agent/data/instances.yaml and data/swebench_pro_raw_sample.jsonl
 # are deliberately NOT generated here -- they're gitignored/regenerable and
 # the latter needs HF_TOKEN, which we don't want baked into an image layer.
-# deployment/prepare-swebench-pro-data.sh generates both lazily on first run
+# benchmarks/swebench_pro/prepare_data.sh generates both lazily on first run
 # (see entrypoint.sh); mount a volume over SWE-bench_Pro-os/data +
 # SWE-agent/data to persist them across container runs.
 
@@ -183,7 +183,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # pillow -- HLE's dataset has an image column, and decoding it fails without it;
 # immutabledict + langdetect -- IFEval's instruction checkers.
 # .venv-lighteval (present locally) is confirmed dead weight -- nothing in
-# scripts/ or tasks/ references lighteval -- so it's intentionally not built.
+# scripts/ or benchmarks/ references lighteval -- so it's intentionally not built.
 
 # --- runtime: assemble the final image --------------------------------------
 FROM base AS runtime
@@ -198,7 +198,7 @@ COPY --from=swebenchpro /app/.venv-swebenchpro /app/.venv-swebenchpro
 COPY --from=lmeval      /app/.venv-lmeval       /app/.venv-lmeval
 
 # Warm the uv cache with pier (DeepSWE driver) so `uv tool run --from
-# datacurve-pier pier ...` in scripts/run_deepswe*.sh does not re-download ~140
+# datacurve-pier pier ...` in benchmarks/deepswe/*.sh does not re-download ~140
 # packages on every run. Kept before COPY scripts/ so script edits don't rebuild it.
 RUN uv tool run --from datacurve-pier pier --help >/dev/null
 
@@ -207,14 +207,13 @@ RUN uv tool run --from datacurve-pier pier --help >/dev/null
 COPY deep-swe/ /app/deep-swe/
 
 # Orchestration layer.
+COPY benchmarks/ /app/benchmarks/
 COPY scripts/ /app/scripts/
-COPY tasks/ /app/tasks/
 COPY docs/ /app/docs/
-COPY patches/ /app/patches/
-COPY deepswe_tasks_*.txt /app/
 COPY README.md .env.example /app/
-COPY deployment/entrypoint.sh deployment/prepare-swebench-pro-data.sh /app/deployment/
-RUN chmod +x /app/deployment/entrypoint.sh /app/deployment/prepare-swebench-pro-data.sh /app/scripts/*.sh
+COPY deployment/entrypoint.sh /app/deployment/
+RUN chmod +x /app/deployment/entrypoint.sh /app/scripts/*.sh \
+    && find /app/benchmarks -name '*.sh' -exec chmod +x {} +
 
 ENTRYPOINT ["/app/deployment/entrypoint.sh"]
 # Default: the vetted main-benchmark recipe, all 3 categories sequentially --

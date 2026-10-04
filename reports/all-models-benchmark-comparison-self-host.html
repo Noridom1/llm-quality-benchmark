@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>So sánh benchmark — toàn bộ model self-host</title>
+<title>Benchmark comparison — all self-host models</title>
 <style>
   .viz-root {
     color-scheme: light;
@@ -103,8 +103,8 @@
 <div class="viz-root">
   <div class="card">
     <p class="eyebrow">Self-host benchmark campaigns</p>
-    <h1>GLM-5.2 vs GLM-5.3 vs gemma4-31b-fp8 — So sánh 8 benchmark</h1>
-    <p class="subtitle">glm5.2-selfhost-extended (baseline), glm5.3-w4afp8 (W4A-FP8), và gemma4-31b-fp8 (google/gemma-4-31b-it self-host, FP8)</p>
+    <h1>GLM-5.2 vs GLM-5.3 vs gemma4-31b-fp8 — 8-benchmark comparison</h1>
+    <p class="subtitle">glm5.2-selfhost-extended (baseline), glm5.3-w4afp8 (W4A-FP8), and gemma4-31b-fp8 (google/gemma-4-31b-it self-host, FP8)</p>
 
     <div class="legend">
       <div class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>GLM-5.2-w4afp8</div>
@@ -113,7 +113,7 @@
     </div>
 
     <div class="chart-wrap">
-      <svg viewBox="0 0 1160 640" role="img" aria-label="So sánh 8 benchmark giữa GLM-5.2, GLM-5.3 và gemma4-31b-fp8 self-host, nhóm theo general / coding / agentic">
+      <svg viewBox="0 0 1160 640" role="img" aria-label="8-benchmark comparison of self-hosted GLM-5.2, GLM-5.3 and gemma4-31b-fp8, grouped by general / coding / agentic">
         <line x1="60" y1="560.0" x2="1120" y2="560.0" class="gridline"/>
     <text x="46" y="564.0" class="axis-label" text-anchor="end">0</text>
     <line x1="60" y1="460.0" x2="1120" y2="460.0" class="gridline"/>
@@ -129,11 +129,11 @@
     <line x1="60" y1="560" x2="1120" y2="560" class="baseline"/>
     <line x1="457.5" y1="34" x2="457.5" y2="605" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>
     <line x1="722.5" y1="34" x2="722.5" y2="605" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>
-    <text x="258.8" y="30" text-anchor="middle" style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;fill:#6b7280">Nhóm kiến thức chung / QA</text>
+    <text x="258.8" y="30" text-anchor="middle" style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;fill:#6b7280">General knowledge / QA</text>
     <rect x="66.0" y="38" width="385.5" height="3" rx="1.5" ry="1.5" fill="#6b7280" opacity="0.55"/>
-    <text x="590.0" y="30" text-anchor="middle" style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;fill:#0f766e">Nhóm coding (single-file)</text>
+    <text x="590.0" y="30" text-anchor="middle" style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;fill:#0f766e">Coding (single-file)</text>
     <rect x="463.5" y="38" width="253.0" height="3" rx="1.5" ry="1.5" fill="#0f766e" opacity="0.55"/>
-    <text x="921.2" y="30" text-anchor="middle" style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;fill:#7c3aed">Nhóm agentic / tool-use</text>
+    <text x="921.2" y="30" text-anchor="middle" style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;fill:#7c3aed">Agentic / tool-use</text>
     <rect x="728.5" y="38" width="385.5" height="3" rx="1.5" ry="1.5" fill="#7c3aed" opacity="0.55"/>
     <rect x="91.2" y="138.3" width="20" height="421.7" rx="4" ry="4" fill="var(--series-1)"><title>GLM-5.2-w4afp8 — GPQA Diamond: 84.34%</title></rect>
     <rect x="116.2" y="120.6" width="20" height="439.4" rx="4" ry="4" fill="var(--series-2)"><title>GLM-5.3-w4afp8 — GPQA Diamond: 87.88%</title></rect>
@@ -203,29 +203,29 @@
     </div>
 
     <div class="footnote">
-      <strong>* LiveCodeBench:</strong> cả 3 model đều nghi contamination, gemma4-31b-fp8 rõ nhất.
-      GLM-5.2/5.3 đã hiệu chỉnh 2 lần: (1) quy về đúng mẫu số 200 câu (glm5.3 bỏ sót 6 câu bị crash lúc
-      chấm điểm thay vì tính fail, baseline bỏ sót 1 câu); (2) verify lại bằng cách tự chạy code model
-      sinh ra với đúng test case thật — phát hiện bug race condition ở khâu chấm song song khiến một số
-      câu bị gán nhầm test case của câu khác rồi chấm sai "fail": glm5.3 2/5 câu fail bị dính (189→191),
-      baseline 1/78 câu (121→122, 77 câu fail thật). gemma4-31b-fp8 dùng mẫu 198/1055 câu, raw 186/198
-      (93.94%), sau khi sửa cùng bug race condition (9/12 câu fail raw thực ra pass) → <strong>98.48%
-      (195/198)</strong> — và đạt <strong>100% tuyệt đối ở độ khó "hard"</strong> dù gần như thất bại
-      hoàn toàn ở SWE-bench Pro/DeepSWE, dấu hiệu contamination mạnh nhất quan sát được trong 3 campaign.
-      <strong>Không câu nào trong 3 số LiveCodeBench nên coi là final</strong> — cần rerun với
-      <code>release_version</code> mới hơn cutoff huấn luyện từng model. Xem README.md từng run và
-      memory lcb-grading-race-condition-bug.md để biết chi tiết.<br>
-      <strong>SciCode:</strong> glm5.2/glm5.3 trùng nhau ở sub-step (40.35%) là trùng hợp thống kê thật,
-      đã verify từng problem (13/30 bài có kết quả khác nhau giữa 2 run) — không phải bug/cache.
-      gemma4-31b-fp8 (41.23%, n=30/65) nhỉnh hơn nhẹ, chênh lệch nằm trong biên độ dao động vì n nhỏ.<br>
-      <strong>BFCL:</strong> trung bình cộng Non-Live Overall và Live Overall (AST), 13/13 category
-      single-turn (không chạy multi-turn/memory/web-search/format-sensitivity) cho cả 3 model.<br>
-      <strong>DeepSWE / SWE-bench Pro (gemma4-31b-fp8):</strong> khoảng cách năng lực agentic rõ rệt
-      nhất — gần như thất bại hoàn toàn (SWE-bench Pro 22.5%, DeepSWE 0.0%) trong khi ở benchmark
-      kiến thức/QA/function-calling một lượt (MMLU-Pro, BFCL, SciCode) chỉ thấp hơn nhẹ hoặc tương
-      đương 2 baseline GLM. Xem gemma4-31b-fp8-full-results.md và jobs/gemma4-31b-fp8/README.md.
+      <strong>* LiveCodeBench:</strong> all 3 models are suspected of contamination, gemma4-31b-fp8 most clearly.
+      GLM-5.2/5.3 were corrected twice: (1) normalized to the correct denominator of 200 problems (glm5.3 had skipped 6 problems that crashed during
+      grading instead of counting them as failures; the baseline had skipped 1); (2) re-verified by running the model-generated
+      code against the real test cases, which uncovered a race condition in the parallel grader that caused some
+      problems to be assigned another problem's test cases and wrongly graded "fail": glm5.3 2/5 failed problems affected (189→191),
+      baseline 1/78 (121→122, 77 genuine failures). gemma4-31b-fp8 uses a 198/1055 sample, raw 186/198
+      (93.94%), and after fixing the same race condition (9/12 raw failures actually pass) → <strong>98.48%
+      (195/198)</strong> — and reaches <strong>an absolute 100% on "hard" difficulty</strong> despite almost completely
+      failing SWE-bench Pro/DeepSWE, the strongest contamination signal observed across the 3 campaigns.
+      <strong>None of the 3 LiveCodeBench numbers should be treated as final</strong> — rerun with a
+      <code>release_version</code> newer than each model's training cutoff. See each run's README.md and
+      the memory note lcb-grading-race-condition-bug.md for details.<br>
+      <strong>SciCode:</strong> glm5.2/glm5.3 matching on sub-step (40.35%) is a genuine statistical coincidence,
+      verified problem by problem (13/30 problems have different results between the 2 runs) — not a bug or caching.
+      gemma4-31b-fp8 (41.23%, n=30/65) is slightly higher, within the noise margin given the small n.<br>
+      <strong>BFCL:</strong> mean of Non-Live Overall and Live Overall (AST), 13/13 single-turn categories
+      (multi-turn/memory/web-search/format-sensitivity not run) for all 3 models.<br>
+      <strong>DeepSWE / SWE-bench Pro (gemma4-31b-fp8):</strong> the clearest agentic capability gap —
+      almost complete failure (SWE-bench Pro 22.5%, DeepSWE 0.0%) while on single-turn
+      knowledge/QA/function-calling benchmarks (MMLU-Pro, BFCL, SciCode) it is only slightly lower than or on par with
+      the 2 GLM baselines. See gemma4-31b-fp8-full-results.md and jobs/gemma4-31b-fp8/README.md.
     </div>
-    <div class="source">Nguồn: jobs/glm5.2-selfhost-extended/, jobs/glm5.3-w4afp8/, jobs/gemma4-31b-fp8/README.md · cập nhật 2026-09-17</div>
+    <div class="source">Source: jobs/glm5.2-selfhost-extended/, jobs/glm5.3-w4afp8/, jobs/gemma4-31b-fp8/README.md · updated 2026-09-17</div>
   </div>
 </div>
 </body>

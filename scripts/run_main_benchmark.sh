@@ -45,7 +45,7 @@
 # Infra failures (Docker disk-full, network-pool exhaustion) should be
 # rerun; model failures (bad patch, protocol violation, LimitsExceeded)
 # should not be -- see memory benchmark-failure-attribution. For SWE-bench
-# Pro specifically, run `scripts/prune_loop.sh` in a spare tmux pane for the
+# Pro specifically, run `benchmarks/swebench_pro/prune_loop.sh` in a spare tmux pane for the
 # duration of the agentic category to avoid the disk-full Docker crashes that
 # hit the glm5.3-w4afp8 run (90/200 instances) before glm5.2-selfhost-extended
 # added prune-loop and saw 0.
@@ -64,7 +64,7 @@ RUN_ID="${RUN_ID:-$(echo "$RAW_MODEL" | tr -c '[:alnum:]._-' '_')}"
 export RUN_ID
 
 # Single override point for generation length across all 8 benchmarks: every
-# run_*.sh script's own MAX_GEN_TOKS/MAX_TOKENS/MAX_GEN_TOKENS default falls
+# benchmarks/<name>/run.sh script's own MAX_GEN_TOKS/MAX_TOKENS/MAX_GEN_TOKENS default falls
 # back to this env var, so exporting it once here is enough (verified against
 # both campaigns' actual output files, not just the launch env -- see memory
 # glm5.3-w4afp8-full-results). Override only if you have a specific reason;
@@ -90,15 +90,15 @@ run_step() {
 run_general() {
   # GPQA Diamond -- full 198/198, 5-shot CoT, CCU 8
   run_step gpqa env RUN_ID="$RUN_ID" NUM_CONCURRENT=8 REQUEST_TIMEOUT=3600 \
-    bash scripts/run_gpqa.sh
+    bash benchmarks/gpqa/run.sh
 
   # MMLU-Pro -- 36 questions/subject x 14 subjects = 504/12,032, CCU 8
   run_step mmlu_pro env RUN_ID="$RUN_ID" NUM_CONCURRENT=8 REQUEST_TIMEOUT=3600 LIMIT=36 \
-    bash scripts/run_mmlu_pro.sh
+    bash benchmarks/mmlu_pro/run.sh
 
   # HLE -- 125/subtask x 2 = 250/2,158 text-only, CCU 6, generate + 3 judges
   run_step hle env RUN_ID="$RUN_ID" NUM_CONCURRENT=6 REQUEST_TIMEOUT=3600 LIMIT=125 \
-    bash scripts/run_hle.sh
+    bash benchmarks/hle/run.sh
 }
 
 run_coding() {
@@ -110,11 +110,11 @@ run_coding() {
   # capability. Override RELEASE_VERSION to something newer than the model's
   # cutoff before trusting a near-saturated score.
   run_step livecodebench env RUN_ID="$RUN_ID" LIMIT=200 MULTIPROCESS=8 \
-    bash scripts/run_livecodebench.sh
+    bash benchmarks/livecodebench/run.sh
 
   # SciCode -- split=test, without_background, 30/65, CCU 8, fixed shuffle seed
   run_step scicode env RUN_ID="$RUN_ID" LIMIT=30 MAX_CONNECTIONS=8 SAMPLE_SHUFFLE=42 \
-    bash scripts/run_scicode.sh
+    bash benchmarks/scicode/run.sh
 }
 
 run_agentic() {
@@ -124,11 +124,11 @@ run_agentic() {
   # 7+6=13) -- confirmed against the harness source, not just the launch env.
   # Deliberately excludes multi_turn/memory/web_search/format_sensitivity.
   run_step bfcl env RUN_ID="$RUN_ID" TEST_CATEGORY=single_turn \
-    bash scripts/run_bfcl.sh
+    bash benchmarks/bfcl/run.sh
 
   # SWE-bench Pro -- first 200/731 instances, CCU 4 agent / 4 eval
   run_step swebench_pro env RUN_ID="$RUN_ID" WORKERS=4 EVAL_WORKERS=4 LIMIT=200 \
-    bash scripts/run_swebench_pro.sh
+    bash benchmarks/swebench_pro/run.sh
 
   # DeepSWE -- full 64/113 random-subset (seed 0) tasks, single CCU-8 run.
   # (The two prior campaigns dove into this via 2-3 batches while probing for
@@ -137,7 +137,7 @@ run_agentic() {
   # deepswe-ccu-docker-network-limit. CCU 8 ran clean both times, so run the
   # full 64 at CCU 8 from the start instead of repeating that discovery.)
   run_step deepswe env RUN_ID="$RUN_ID" \
-    bash scripts/run_deepswe.sh 64 8
+    bash benchmarks/deepswe/run.sh 64 8
 }
 
 CATEGORIES=("$@")

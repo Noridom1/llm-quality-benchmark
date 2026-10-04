@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Code Generation: GLM-5.2 vs GLM-5.3</title>
@@ -96,9 +96,9 @@
 <body>
 <div class="viz-root">
   <div class="card">
-    <p class="eyebrow">Nhóm 2 / 3 · Code Generation</p>
+    <p class="eyebrow">Group 2 / 3 · Code Generation</p>
     <h1>Code Generation: GLM-5.2 vs GLM-5.3</h1>
-    <p class="subtitle">Sinh code một lượt (competitive programming, bài khoa học)</p>
+    <p class="subtitle">Single-pass code generation (competitive programming, scientific problems)</p>
     <div class="legend">
       <div class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>GLM-5.2-w4afp8</div>
       <div class="legend-item"><span class="swatch" style="background:var(--series-2)"></span>GLM-5.3-w4afp8</div>
@@ -127,13 +127,13 @@
         <text x="370.5" y="350.2" class="value-label" text-anchor="middle">40.35</text>
         <text x="409.5" y="350.2" class="value-label" text-anchor="middle">40.35</text>
         <text x="170.0" y="584" class="cat-label" text-anchor="middle">LiveCodeBench*</text>
-        <text x="170.0" y="601" class="cat-sublabel" text-anchor="middle">Pass@1 (200 câu, mẫu số đã hiệu chỉnh)</text>
+        <text x="170.0" y="601" class="cat-sublabel" text-anchor="middle">Pass@1 (200 problems, corrected denominator)</text>
         <text x="390.0" y="584" class="cat-label" text-anchor="middle">SciCode</text>
         <text x="390.0" y="601" class="cat-sublabel" text-anchor="middle">Sub-step correctness (114 step)</text>
       </svg>
     </div>
-    <div class="footnote"><strong>* LiveCodeBench:</strong> số đã hiệu chỉnh về đúng mẫu số 200 câu (bản gốc harness báo 97.42%/94 nhưng bỏ sót 6 câu bị crash lúc chấm điểm thay vì tính fail — đã sửa lại; baseline cũng hiệu chỉnh tương tự, 60.80%→60.50%). Vẫn còn nghi vấn contamination do gần bão hoà ở cả câu khó (97.1%) — <strong>chưa nên coi là số final</strong>, xem README.md để biết chi tiết.<br><strong>SciCode:</strong> hai giá trị sub-step trùng nhau (40.35%) là trùng hợp thống kê thật, đã verify từng problem (13/30 bài có kết quả khác nhau giữa 2 run) — không phải bug/cache.</div>
-    <div class="source">Nguồn: jobs/glm5.2-selfhost-extended/ và jobs/glm5.3-w4afp8/README.md · cập nhật 2026-09-14</div>
+    <div class="footnote"><strong>* LiveCodeBench:</strong> corrected to the proper denominator of 200 problems (the harness originally reported 97.42%/94 but skipped 6 problems that crashed during grading instead of counting them as failures; now fixed; the baseline was corrected the same way, 60.80%→60.50%). Contamination is still suspected because scores are near saturation even on hard problems (97.1%) — <strong>this should not be treated as a final number</strong>; see README.md for details.<br><strong>SciCode:</strong> the two identical sub-step values (40.35%) are a genuine statistical coincidence, verified problem by problem (13/30 problems have different results between the 2 runs) — not a bug or caching.</div>
+    <div class="source">Source: jobs/glm5.2-selfhost-extended/ and jobs/glm5.3-w4afp8/README.md · updated 2026-09-14</div>
   </div>
 </div>
 </body>

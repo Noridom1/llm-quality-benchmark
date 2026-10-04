@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Knowledge & Tool-use: GLM-5.2 vs GLM-5.3</title>
@@ -96,9 +96,9 @@
 <body>
 <div class="viz-root">
   <div class="card">
-    <p class="eyebrow">Nhóm 3 / 3 · Knowledge, Reasoning & Tool-use</p>
+    <p class="eyebrow">Group 3 / 3 · Knowledge, Reasoning & Tool-use</p>
     <h1>Knowledge & Tool-use: GLM-5.2 vs GLM-5.3</h1>
-    <p class="subtitle">Kiến thức tổng quát, suy luận chuyên sâu, và gọi hàm/tool</p>
+    <p class="subtitle">General knowledge, deep reasoning, and function/tool calling</p>
     <div class="legend">
       <div class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>GLM-5.2-w4afp8</div>
       <div class="legend-item"><span class="swatch" style="background:var(--series-2)"></span>GLM-5.3-w4afp8</div>
@@ -144,8 +144,8 @@
         <text x="830.0" y="601" class="cat-sublabel" text-anchor="middle">Overall avg (13 category)</text>
       </svg>
     </div>
-    <div class="footnote"><strong>BFCL:</strong> trung bình cộng Non-Live Overall và Live Overall (AST), đủ 13/13 category single-turn.<br><strong>HLE:</strong> dùng lớp LLM-judge (deepseek-v4-pro), đã kiểm chứng chéo, không dùng số exact-match thô.</div>
-    <div class="source">Nguồn: jobs/glm5.2-selfhost-extended/ và jobs/glm5.3-w4afp8/README.md · cập nhật 2026-09-14</div>
+    <div class="footnote"><strong>BFCL:</strong> mean of Non-Live Overall and Live Overall (AST), all 13/13 single-turn categories.<br><strong>HLE:</strong> scored with an LLM judge (deepseek-v4-pro), cross-validated; raw exact-match numbers are not used.</div>
+    <div class="source">Source: jobs/glm5.2-selfhost-extended/ and jobs/glm5.3-w4afp8/README.md · updated 2026-09-14</div>
   </div>
 </div>
 </body>

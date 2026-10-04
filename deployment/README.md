@@ -12,13 +12,13 @@ a campaign, monitoring, viewing results -- see
 ## Build
 
 ```bash
-cd /home/stackops/benchmark
+cd <repo-root>
 docker build -f deployment/Dockerfile -t quality-bench:latest .
 ```
 
 This clones BFCL, LiveCodeBench, SciCode, and SWE-bench Pro (+ its `SWE-agent`
 and `mini-swe-agent` submodules) fresh from upstream at build time and applies
-our local patches from `patches/` on top -- it does **not** copy the local
+our local patches from `benchmarks/<name>/patches/` on top -- it does **not** copy the local
 checkouts (see `.dockerignore` / `deployment/Dockerfile` comments). Needs
 network access during build. `deep-swe/` (no upstream remote) and SciCode's
 `eval/data/test_data.h5` (~1GB, no programmatic source) are copied in from the
@@ -55,11 +55,11 @@ running the scripts locally.
 docker run ... quality-bench:latest general coding
 
 # A single benchmark directly, bypassing run_main_benchmark.sh entirely --
-# any script under scripts/ works, with its own env vars passed via -e:
+# any benchmark works, by name or by path, with its own env vars passed via -e:
 docker run --rm -it \
   -e API_KEY=... -e OPENAI_BASE_URL=... -e MODEL_NAME=... \
   -e LIMIT=20 -e NUM_CONCURRENT=4 \
-  quality-bench:latest scripts/run_gpqa.sh
+  quality-bench:latest gpqa          # or: benchmarks/gpqa/run.sh
 ```
 
 ### Env vars
@@ -72,9 +72,9 @@ docker run --rm -it \
 | `HF_TOKEN` | yes, for GPQA / MMLU-Pro / HLE / SWE-bench Pro | GPQA's dataset (`Idavidrein/gpqa`) is gated on Hugging Face and fails outright without it; MMLU-Pro/HLE also read it (higher rate limits / avoids "unauthenticated requests" throttling). For SWE-bench Pro it's needed to export the `ScaleAI/SWE-bench_Pro` dataset on first agentic run (see below). In short: set it unless you're only running LiveCodeBench/SciCode/BFCL/DeepSWE. |
 | `HLE_MAIN_JUDGE` / `HLE_SECOND_JUDGE` / `HLE_SELF_JUDGE` | for HLE | Same as local `.env` -- see top-level `README.md`. Only forwarded when passed; leave unset to get the defaults. |
 | `HLE_JUDGE_BASE_URL` / `HLE_JUDGE_API_KEY` | for HLE, when the endpoint under test doesn't serve the judge models | Where the independent judges are called. Default to `OPENAI_BASE_URL` / `API_KEY`. Without a reachable judge, HLE generation still completes but the run exits 1 with no score. |
-| `RUN_ID`, `LIMIT`, `NUM_CONCURRENT`, `WORKERS`, `CCU`, etc. | no | Same per-benchmark overrides documented in `scripts/README.md` / `scripts/run_main_benchmark.sh`, passed through as ordinary `-e` flags. |
+| `RUN_ID`, `LIMIT`, `NUM_CONCURRENT`, `WORKERS`, `CCU`, etc. | no | Same per-benchmark overrides documented in `benchmarks/<name>/README.md` / `scripts/run_main_benchmark.sh`, passed through as ordinary `-e` flags. |
 
-Any other env var a specific `scripts/run_*.sh` reads works the same way --
+Any other env var a specific `benchmarks/<name>/run.sh` reads works the same way --
 the entrypoint doesn't need to know about it, since `docker run -e` already
 injects it into the container's environment before the script runs.
 
@@ -92,9 +92,9 @@ can't run Docker *inside* itself usefully, so it needs the **host's** socket:
 The containers it launches are then siblings on the host, not nested. This
 also means the *host* needs disk headroom for SWE-bench Pro's per-instance
 images (~1-3GB each) -- run a prune loop on the host, or pass
-`-e ...` to invoke `scripts/prune_loop.sh` in a sibling container pointed at
+`-e ...` to invoke `benchmarks/swebench_pro/prune_loop.sh` in a sibling container pointed at
 the same socket. DeepSWE leaves its own per-trial images behind and needs
-`scripts/prune_deepswe_loop.sh` instead (see `docs/running-via-docker.md`).
+`benchmarks/deepswe/prune_loop.sh` instead (see `docs/running-via-docker.md`).
 DeepSWE's CCU is capped at 8 by the host's default Docker
 network-address-pool (~31 networks, 2/trial); `run_main_benchmark.sh` already
 bakes this in.
@@ -135,7 +135,7 @@ To avoid regenerating them on every container run, mount a persistent volume:
 - **LiveCodeBench**: installed with `--no-deps` + an explicit runtime
   dependency list, dropping `torch`/`vllm` (declared in `pyproject.toml` but
   only used for local-model inference, never imported by the OpenAI-API path
-  `scripts/run_livecodebench.sh` uses -- confirmed against the locally-vetted
+  `benchmarks/livecodebench/run.sh` uses -- confirmed against the locally-vetted
   venv, which doesn't have them installed either).
 - **BFCL**: kept as a plain `-e .`, including the transitive CUDA `torch`
   pull via `sentence-transformers` -- reproduces exactly what's vetted
@@ -144,8 +144,8 @@ To avoid regenerating them on every container run, mount a persistent volume:
   need it.
 - **lm-eval** (GPQA/MMLU-Pro/HLE): only `.venv-lmeval` is built.
   `.venv-lighteval`, present locally, is confirmed unused by anything in
-  `scripts/`/`tasks/` and intentionally left out.
+  `scripts/`/`benchmarks/` and intentionally left out.
 - **DeepSWE**: no venv at all -- it runs entirely via `uv tool run --from
   datacurve-pier pier run ...` (ephemeral, uv-cached) plus the
-  `tasks/deepswe-pier-streaming/` sitecustomize patch, exactly as it does
+  `benchmarks/deepswe/streaming/` sitecustomize patch, exactly as it does
   locally.

@@ -37,25 +37,25 @@ evaluation timeouts.
 
 ```bash
 # GPQA: first 20
-LIMIT=20 bash scripts/run_gpqa.sh
+LIMIT=20 bash benchmarks/gpqa/run.sh
 
 # MMLU-Pro: first 20 per subtask (280 total)
-LIMIT=20 bash scripts/run_mmlu_pro.sh
+LIMIT=20 bash benchmarks/mmlu_pro/run.sh
 
 # HLE: first 20 per subtask (40 total)
-LIMIT=20 bash scripts/run_hle.sh
+LIMIT=20 bash benchmarks/hle/run.sh
 
 # SciCode: first 20 main problems
-LIMIT=20 bash scripts/run_scicode.sh
+LIMIT=20 bash benchmarks/scicode/run.sh
 
 # LiveCodeBench: first 20 problems
-LIMIT=20 bash scripts/run_livecodebench.sh
+LIMIT=20 bash benchmarks/livecodebench/run.sh
 
 # SWE-bench Pro: first 20 instances
-LIMIT=20 bash scripts/run_swebench_pro.sh
+LIMIT=20 bash benchmarks/swebench_pro/run.sh
 
 # DeepSWE: 20-task sample (CCU 4)
-bash scripts/run_deepswe.sh 20 4
+bash benchmarks/deepswe/run.sh 20 4
 ```
 
 ## Reducing Wall Time
@@ -63,9 +63,9 @@ bash scripts/run_deepswe.sh 20 4
 Increase concurrency to cut wall time (at the cost of higher API load):
 
 ```bash
-NUM_CONCURRENT=8  bash scripts/run_gpqa.sh        # ~10 min
-NUM_CONCURRENT=16 bash scripts/run_mmlu_pro.sh    # ~5.5 hours
-MULTIPROCESS=8    bash scripts/run_livecodebench.sh  # ~4 hours
-WORKERS=8 EVAL_WORKERS=8 bash scripts/run_swebench_pro.sh  # ~15 hours
-CCU=8                bash scripts/run_deepswe_batches.sh  # ~15 hours
+NUM_CONCURRENT=8  bash benchmarks/gpqa/run.sh        # ~10 min
+NUM_CONCURRENT=16 bash benchmarks/mmlu_pro/run.sh    # ~5.5 hours
+MULTIPROCESS=8    bash benchmarks/livecodebench/run.sh  # ~4 hours
+WORKERS=8 EVAL_WORKERS=8 bash benchmarks/swebench_pro/run.sh  # ~15 hours
+CCU=8                bash benchmarks/deepswe/run_batches.sh  # ~15 hours
 ```

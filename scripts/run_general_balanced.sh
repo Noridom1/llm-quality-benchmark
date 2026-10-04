@@ -69,15 +69,15 @@ run_one() {
 
 # 1) GPQA -- 50 seeded-random samples
 export SAMPLE_N=50; unset LIMIT
-run_one gpqa "bash scripts/run_gpqa.sh"
+run_one gpqa "bash benchmarks/gpqa/run.sh"
 
 # 2) MMLU-Pro -- 7 per subtask * 14 = 98 (Balanced ~100)
 export LIMIT=7; unset SAMPLE_N
-run_one mmlu_pro "bash scripts/run_mmlu_pro.sh"
+run_one mmlu_pro "bash benchmarks/mmlu_pro/run.sh"
 
 # 3) HLE -- 25 per subtask * 2 = 50 (Balanced 50)
 export LIMIT=25; unset SAMPLE_N
-run_one hle "bash scripts/run_hle.sh"
+run_one hle "bash benchmarks/hle/run.sh"
 
 echo
 echo "############################################################"

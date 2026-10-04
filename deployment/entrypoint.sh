@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Container entrypoint: translates the external env-var contract into the
-# .env file every scripts/run_*.sh already expects (`set -a; source .env;
+# .env file every benchmarks/<name>/run.sh already expects (`set -a; source .env;
 # set +a`), then dispatches based on the arguments docker was run with.
 #
 # Usage (see deployment/README.md for full examples):
 #   docker run -e API_KEY=... -e OPENAI_BASE_URL=... -e MODEL_NAME=... \
 #     image [general] [coding] [agentic]        # run_main_benchmark.sh categories
-#   docker run ... image scripts/run_gpqa.sh    # a single benchmark script directly
+#   docker run ... image gpqa [args...]          # one benchmark by name (benchmarks/<name>/run.sh)
+#   docker run ... image benchmarks/gpqa/run.sh  # same, by path (any script under scripts/ also works)
 set -euo pipefail
 cd /app
 
@@ -22,7 +23,7 @@ HF_TOKEN=${HF_TOKEN:-}
 EOF
 
 # HLE judge knobs: only written when actually passed with -e. Writing an unset
-# one as an empty line is not neutral -- run_hle.sh reads HLE_SECOND_JUDGE=
+# one as an empty line is not neutral -- benchmarks/hle/run.sh reads HLE_SECOND_JUDGE=
 # (set but empty) as "no second judge", which silently dropped the default
 # cross-check judge in every container run.
 for _v in HLE_MAIN_JUDGE HLE_SECOND_JUDGE HLE_SELF_JUDGE \
@@ -80,7 +81,7 @@ check_jobs_root_visible_to_host() {
 
 needs_docker() {
   case " $* " in
-    *" agentic "*|*" swebench_pro "*|*" deepswe "*|*run_swebench_pro.sh*|*run_deepswe*) return 0 ;;
+    *" agentic "*|*" swebench_pro "*|*" deepswe "*|*benchmarks/swebench_pro/*|*benchmarks/deepswe/*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -94,15 +95,20 @@ if needs_docker "$@"; then
   fi
   check_jobs_root_visible_to_host
   case " $* " in
-    *" agentic "*|*" swebench_pro "*|*run_swebench_pro.sh*)
-      bash /app/deployment/prepare-swebench-pro-data.sh
+    *" agentic "*|*" swebench_pro "*|*benchmarks/swebench_pro/*)
+      bash /app/benchmarks/swebench_pro/prepare_data.sh
       ;;
   esac
 fi
 
-# Direct single-script invocation, e.g. `docker run ... image scripts/run_gpqa.sh`.
-if [[ "${1:-}" == scripts/*.sh ]]; then
+# Direct invocation: a benchmark by name (`image gpqa`, `image deepswe 20 8`) or
+# a script by path (`image benchmarks/gpqa/run.sh`, `image scripts/progress.sh`).
+if [[ "${1:-}" =~ ^(scripts|benchmarks)/.*\.sh$ ]]; then
   exec bash "$@"
+fi
+if [[ -n "${1:-}" && "$1" != _* && -f "benchmarks/$1/run.sh" ]]; then
+  _b="$1"; shift
+  exec bash "benchmarks/$_b/run.sh" "$@"
 fi
 
 # Otherwise treat args as run_main_benchmark.sh category names
