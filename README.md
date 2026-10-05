@@ -29,6 +29,9 @@ operational playbook.
 
 ```bash
 docker build -f deployment/Dockerfile -t quality-bench:latest .
+# or pull the published image (pin the digest for a reproducible run):
+docker pull ghcr.io/noridom1/llm-quality-benchmark:testing
+docker pull ghcr.io/noridom1/llm-quality-benchmark@sha256:a4a7809dd74e...
 ```
 
 ### Image versions
@@ -55,9 +58,37 @@ cp .env.example .env        # then fill it in, see Configuration
 ```
 
 Direct runs need each benchmark's upstream checkout and virtualenv next to this
-repo (`BFCL/`, `LiveCodeBench/`, `SciCode/`, `SWE-bench_Pro-os/`, `deep-swe/`,
-`.venv-*`). They are gitignored; the Dockerfile shows exactly how each one is
-cloned, pinned, patched and installed.
+repo. They are gitignored; `scripts/setup_upstream.sh` clones each upstream at
+its pinned commit, applies our patch series and builds the venv — the same
+steps the Dockerfile performs at image build time:
+
+```bash
+scripts/setup_upstream.sh gpqa        # lm-eval venv only (gpqa/mmlu_pro/hle/ifeval)
+scripts/setup_upstream.sh bfcl lcb    # chosen benchmarks
+scripts/setup_upstream.sh all         # everything (bfcl pulls a multi-GB CUDA wheel)
+```
+
+| Benchmark | Upstream (pinned) | Patches | Python | Venv |
+|---|---|---|---|---|
+| GPQA, MMLU-Pro, HLE, IFEval | none (lm-eval 0.4.12 from PyPI) | — | 3.12 | `.venv-lmeval` |
+| BFCL v4 | `ShishirPatil/gorilla` @ `6ea5797` | [`benchmarks/bfcl/patches/`](benchmarks/bfcl/patches/) | 3.10 | `BFCL/berkeley-function-call-leaderboard/.venv-bfcl` |
+| LiveCodeBench | `LiveCodeBench/LiveCodeBench` @ `28fef95` | [`benchmarks/livecodebench/patches/`](benchmarks/livecodebench/patches/) | 3.11 | `LiveCodeBench/.venv-lcb` |
+| SciCode | `scicode-bench/SciCode` @ `e3158ea` | none | 3.12 | `.venv-scicode` |
+| SWE-bench Pro | `scaleapi/SWE-bench_Pro-os` @ `ca10a60` (+ `SWE-agent` @ `402a7b8`, `mini-swe-agent` @ `d74716a`) | [`benchmarks/swebench_pro/patches/`](benchmarks/swebench_pro/patches/) | 3.11 | `.venv-swebenchpro` |
+| DeepSWE | vendored in-repo (`deep-swe/`) | — | pier (uv tool, fetched on first run) | — |
+
+Notes for direct runs:
+
+- Prereqs: `git` and [`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+- SciCode also needs `SciCode/eval/data/test_data.h5` (~1 GB, no programmatic
+  source — manual download, see SciCode's README); the setup script warns if
+  it's missing.
+- The agentic benchmarks (SWE-bench Pro, DeepSWE) need a working `docker`
+  CLI + daemon at run time for their per-instance containers, and
+  SWE-bench Pro generates its dataset on first run (`HF_TOKEN` required).
+- To set one up by hand instead, follow the per-benchmark stages in
+  [`deployment/Dockerfile`](deployment/Dockerfile) — the script mirrors them
+  exactly, and the pins live in both places.
 
 ```bash
 RUN_ID=my-model bash benchmarks/gpqa/run.sh                    # one benchmark

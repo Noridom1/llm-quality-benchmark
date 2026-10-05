@@ -48,7 +48,10 @@ Every `run.sh` follows the same conventions:
    rather than committing the checkout.
 3. **Docker image:** add a build stage in `deployment/Dockerfile` (pinned upstream commit,
    `COPY benchmarks/<name>/patches/`, own venv) and a `COPY --from=` line in the
-   `runtime` stage. `benchmarks/` itself is already copied wholesale.
+   `runtime` stage. `benchmarks/` itself is already copied wholesale. If the
+   benchmark has an upstream checkout, also add a `setup_<name>()` case to
+   `scripts/setup_upstream.sh` and a row to the "Direct-run setup" table in the
+   root `README.md` — the pins live in all three places and must stay in sync.
 4. **Entrypoint:** if it launches sibling containers, add its name to `needs_docker()` in
    `deployment/entrypoint.sh`. `docker run <image> <name>` works automatically for
    any directory that has a `run.sh`.
