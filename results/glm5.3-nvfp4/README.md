@@ -12,6 +12,8 @@ Configuration matches [glm5.3-w4afp8](../glm5.3-w4afp8/README.md) and the baseli
 Raw artifacts: `jobs/glm5.3-nvfp4/` (+ `jobs/glm5.3-nvfp4-s{1..4}/` with-network SWE-bench Pro shards,
 `jobs/glm5.3-nvfp4-nonet-{s1..s4,r1}/` no-network SWE-bench Pro) on thanglq5.
 
+> **⚠️ SWE-bench Pro score is not clean (audit, 2026-11-27).** The task images contain the full upstream git history, including commits newer than the base commit, so the real fix is reachable with `git log --all` / `git branch -a` / `git show <sha>` even with `--network none`. Agents used these commands in 166 of 200 instances (pass rate 86% with git-history use vs 62% without), and some trajectories say their diff "matches the upstream fix". The gap to FP8 is mostly hit-the-step-limit (`LimitsExceeded` 20 vs 43) plus the git-history effect, not quantization. Do not compare SWE-bench Pro across runs or quote it as a model-quality score until it is rerun with git history stripped. The other benchmarks (DeepSWE included) are not affected. Audit data: `audit_rows.json` on the bench host.
+
 ## Summary
 
 | Benchmark | glm5.3-nvfp4 | glm5.3-w4afp8 | glm5.2 baseline |

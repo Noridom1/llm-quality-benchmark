@@ -7,6 +7,8 @@ Bench client image: `ghcr.io/noridom1/llm-quality-benchmark:testing`. Config mat
 [glm5.3-fp8](../glm5.3-fp8/README.md): `max_gen_toks` = **65536**, same subsets, temperature 0.
 Raw artifacts: `jobs/dsv41-flash-fp8/`, `jobs/dsv41-flash-fp8-nonet-{s1..s4,r1}/` on the bench host.
 
+> **⚠️ SWE-bench Pro score is not clean (audit, 2026-11-27).** The task images contain the full upstream git history, including commits newer than the base commit, so the real fix is reachable with `git log --all` / `git branch -a` / `git show <sha>` even with `--network none`. Agents used these commands in 45 of 200 instances (pass rate 82% with git-history use vs 47% without), and some trajectories say their diff "matches the upstream fix". The score is also depressed by format failures (35 format errors per instance, 150 instances with DSML, 46 empty patches), so it understates the model and is not comparable with the NVFP4 run. Do not compare SWE-bench Pro across runs or quote it as a model-quality score until it is rerun with git history stripped. The other benchmarks (DeepSWE included) are not affected. Audit data: `audit_rows.json` on the bench host.
+
 ## Summary
 
 | Benchmark | dsv41-flash-fp8 | glm5.3-fp8 (reference) |
